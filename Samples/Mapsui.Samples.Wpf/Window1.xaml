@@ -17,8 +17,10 @@
                 <Border BorderBrush="White" Opacity="0.65" Background="White" BorderThickness="6" MinWidth="140"
                                 MinHeight="30" VerticalAlignment="Top" HorizontalAlignment="Left">
                     <DockPanel>
-                    <StackPanel DockPanel.Dock="Top">
-                        <ComboBox Name="RenderMode" Margin="0,0, 0, 10">
+                        <StackPanel DockPanel.Dock="Top">
+                            <Button Name="Soep" Content="Soep Soep Soep" Click="Soep_OnClick" Margin="10" />
+
+<ComboBox Name="RenderMode" Margin="0,0, 0, 10">
                             <ComboBoxItem IsSelected="True">Skia renderer</ComboBoxItem>
                             <ComboBoxItem >Wpf renderer</ComboBoxItem>
                         </ComboBox>

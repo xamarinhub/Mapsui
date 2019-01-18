@@ -1,16 +1,23 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using BruTile.MbTiles;
+using Mapsui.Layers;
 using Mapsui.Logging;
+using Mapsui.Projection;
 using Mapsui.Samples.CustomWidget;
 using Mapsui.Samples.Wpf.Utilities;
 using Mapsui.UI;
 using Mapsui.Samples.Common;
 using Mapsui.Samples.Common.Desktop;
+using Mapsui.Samples.Common.Maps;
+using Mapsui.Utilities;
+using SQLite;
 
 namespace Mapsui.Samples.Wpf
 {
@@ -146,5 +153,35 @@ namespace Mapsui.Samples.Wpf
             if (args.MapInfo.Feature != null)
                 FeatureInfo.Text = $"Click Info:{Environment.NewLine}{args.MapInfo.Feature.ToDisplayText()}";
         }
+
+        private void Soep_OnClick(object sender, RoutedEventArgs e)
+        {
+ 
+
+           // MapControl.Map.Layers.Add(OpenStreetMap.CreateTileLayer());
+            MapControl.Map.Home = null;
+            MapControl.Map.Layers.Add(CreateMbTilesLayer(Path.Combine(MbTilesSample.MbTilesLocation, "world.mbtiles")));
+
+            var mapResolutions = MapControl.Map.Resolutions.ToList();
+            //does not work, except I wait before this call a couple of seconds
+            var resolution = (double) mapResolutions[(int) (mapResolutions.Count / 2)];
+            MapControl.Navigator.NavigateTo(new Geometries.Point(0, 0), resolution);
+
+            //// Get the lon lat coordinates from somewhere (Mapsui can not help you there)
+            //var centerOfLondonOntario = new Point(-81.2497, 42.9837);
+            //// OSM uses spherical mercator coordinates. So transform the lon lat coordinates to spherical mercator
+            //var sphericalMercatorCoordinate = SphericalMercator.FromLonLat(centerOfLondonOntario.X, centerOfLondonOntario.Y);
+            //// Set the center of the viewport to the coordinate. The UI will refresh automatically
+            //// Additionally you might want to set the resolution, this could depend on your specific purpose
+            //MapControl.Navigator.NavigateTo(sphericalMercatorCoordinate, 23);
+        }
+        public static TileLayer CreateMbTilesLayer(string path)
+        {
+            var mbTilesTileSource = new MbTilesTileSource(new SQLiteConnectionString(path, true));
+            var mbTilesLayer = new TileLayer(mbTilesTileSource);
+            return mbTilesLayer;
+        }
+
+
     }
 }

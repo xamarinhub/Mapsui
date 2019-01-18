@@ -22,7 +22,7 @@ namespace Mapsui.Samples.Common.Maps
                 CRS = "EPSG:3857",
                 Transformation = new MinimalTransformation()
             };
-            map.Layers.Add(OpenStreetMap.CreateTileLayer());
+            //!!!map.Layers.Add(OpenStreetMap.CreateTileLayer());
             map.Widgets.Add(new ScaleBarWidget(map) { TextAlignment=Widgets.Alignment.Center, HorizontalAlignment = Widgets.HorizontalAlignment.Center, VerticalAlignment = Widgets.VerticalAlignment.Top });
             map.Widgets.Add(new Widgets.Zoom.ZoomInOutWidget { MarginX = 20, MarginY = 40 });
             return map;

@@ -8,6 +8,7 @@ using Mapsui.UI.Forms;
 using Plugin.Geolocator;
 using Plugin.Geolocator.Abstractions;
 using Mapsui.UI;
+using System.Linq;
 
 namespace Mapsui.Samples.Forms
 {
@@ -26,6 +27,8 @@ namespace Mapsui.Samples.Forms
         public MapPage(Action<IMapControl> setup, Func<MapView, MapClickedEventArgs, bool> c = null)
         {
             InitializeComponent();
+
+            Button1.Clicked += ButtonOnClick;
 
             mapView.RotationLock = false;
             mapView.UnSnapRotationDegrees = 30;
@@ -125,6 +128,27 @@ namespace Mapsui.Samples.Forms
                 mapView.MyLocationLayer.UpdateMyDirection(e.Position.Heading, mapView.Viewport.Rotation);
                 mapView.MyLocationLayer.UpdateMySpeed(e.Position.Speed);
             });
+        }
+
+        private void ButtonOnClick(object sender, EventArgs e)
+        {
+
+            mapView.Map.Layers.Add(Utilities.OpenStreetMap.CreateTileLayer());
+            //_mapControl.Map.Home = null;
+            //_mapControl.Map.Layers.Add(CreateMbTilesLayer(Path.Combine(MbTilesSample.MbTilesLocation, "world.mbtiles")));
+
+            var mapResolutions = mapView.Map.Resolutions.ToList();
+            //does not work, except I wait before this call a couple of seconds
+            var resolution = (double)mapResolutions[(int)(mapResolutions.Count / 2)];
+            mapView.Navigator.NavigateTo(new Geometries.Point(0, 0), resolution);
+
+            //// Get the lon lat coordinates from somewhere (Mapsui can not help you there)
+            //var centerOfLondonOntario = new Point(-81.2497, 42.9837);
+            //// OSM uses spherical mercator coordinates. So transform the lon lat coordinates to spherical mercator
+            //var sphericalMercatorCoordinate = SphericalMercator.FromLonLat(centerOfLondonOntario.X, centerOfLondonOntario.Y);
+            //// Set the center of the viewport to the coordinate. The UI will refresh automatically
+            //// Additionally you might want to set the resolution, this could depend on your specific purpose
+            //MapControl.Navigator.NavigateTo(sphericalMercatorCoordinate, 23);
         }
     }
 }

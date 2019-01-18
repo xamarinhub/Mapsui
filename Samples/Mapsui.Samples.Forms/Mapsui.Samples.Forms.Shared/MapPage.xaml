@@ -5,6 +5,7 @@
              x:Class="Mapsui.Samples.Forms.MapPage">
     <ContentPage.Content>
         <StackLayout>
+            <Button Text="Do it" x:Name="Button1"></Button>
           <mapsui:MapView x:Name="mapView"
 		    VerticalOptions="FillAndExpand"
             HorizontalOptions="Fill"

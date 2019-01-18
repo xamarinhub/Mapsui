@@ -12,6 +12,8 @@ using Mapsui.Samples.Common.Helpers;
 using Mapsui.Samples.Common.Maps;
 using Mapsui.UI;
 using Mapsui.UI.Android;
+using Mapsui.Utilities;
+using Path = System.IO.Path;
 
 namespace Mapsui.Samples.Droid
 {
@@ -43,13 +45,47 @@ namespace Mapsui.Samples.Droid
             _mapControl.ReSnapRotationDegrees = 5;
 
             FindViewById<RelativeLayout>(Resource.Id.mainLayout).AddView(_popup = CreatePopup());
+            FindViewById<RelativeLayout>(Resource.Id.mainLayout).AddView(CreateButton());
 
             _mapControl.Map.Layers.Clear();
-            var sample=new MbTilesOverlaySample();
+            var sample=new OsmSample();
             sample.Setup(_mapControl);
 
             //_mapControl.Info += MapControlOnInfo;
             //LayerList.Initialize(_mapControl.Map.Layers);
+        }
+
+        private View CreateButton()
+        {
+            var button = new Button(this);
+            button.SetPadding(5, 5, 5, 5);
+            button.Text = "Add Layer";
+            button.SetBackgroundColor(Color.Red);
+            button.Visibility = ViewStates.Visible;
+            button.Click += ButtonOnClick;
+            return button;
+
+        }
+
+        private void ButtonOnClick(object sender, EventArgs e)
+        {
+
+            _mapControl.Map.Layers.Add(OpenStreetMap.CreateTileLayer());
+            //_mapControl.Map.Home = null;
+            //_mapControl.Map.Layers.Add(CreateMbTilesLayer(Path.Combine(MbTilesSample.MbTilesLocation, "world.mbtiles")));
+
+            var mapResolutions = _mapControl.Map.Resolutions.ToList();
+            //does not work, except I wait before this call a couple of seconds
+            var resolution = (double)mapResolutions[(int)(mapResolutions.Count / 2)];
+            _mapControl.Navigator.NavigateTo(new Geometries.Point(0, 0), resolution);
+
+            //// Get the lon lat coordinates from somewhere (Mapsui can not help you there)
+            //var centerOfLondonOntario = new Point(-81.2497, 42.9837);
+            //// OSM uses spherical mercator coordinates. So transform the lon lat coordinates to spherical mercator
+            //var sphericalMercatorCoordinate = SphericalMercator.FromLonLat(centerOfLondonOntario.X, centerOfLondonOntario.Y);
+            //// Set the center of the viewport to the coordinate. The UI will refresh automatically
+            //// Additionally you might want to set the resolution, this could depend on your specific purpose
+            //MapControl.Navigator.NavigateTo(sphericalMercatorCoordinate, 23);
         }
 
         public override bool OnCreateOptionsMenu(IMenu menu)
