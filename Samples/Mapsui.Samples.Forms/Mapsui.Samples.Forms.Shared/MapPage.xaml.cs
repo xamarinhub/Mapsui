@@ -9,6 +9,9 @@ using Plugin.Geolocator;
 using Plugin.Geolocator.Abstractions;
 using Mapsui.UI;
 using System.Linq;
+using Mapsui.Layers;
+using BruTile.MbTiles;
+using SQLite;
 
 namespace Mapsui.Samples.Forms
 {
@@ -133,9 +136,9 @@ namespace Mapsui.Samples.Forms
         private void ButtonOnClick(object sender, EventArgs e)
         {
 
-            mapView.Map.Layers.Add(Utilities.OpenStreetMap.CreateTileLayer());
+            //mapView.Map.Layers.Add(Utilities.OpenStreetMap.CreateTileLayer());
             //_mapControl.Map.Home = null;
-            //_mapControl.Map.Layers.Add(CreateMbTilesLayer(Path.Combine(MbTilesSample.MbTilesLocation, "world.mbtiles")));
+            mapView.Map.Layers.Add(CreateMbTilesLayer(Path.Combine(MbTilesSample.MbTilesLocation, "world.mbtiles")));
 
             var mapResolutions = mapView.Map.Resolutions.ToList();
             //does not work, except I wait before this call a couple of seconds
@@ -149,6 +152,13 @@ namespace Mapsui.Samples.Forms
             //// Set the center of the viewport to the coordinate. The UI will refresh automatically
             //// Additionally you might want to set the resolution, this could depend on your specific purpose
             //MapControl.Navigator.NavigateTo(sphericalMercatorCoordinate, 23);
+        }
+
+        public static TileLayer CreateMbTilesLayer(string path)
+        {
+            var mbTilesTileSource = new MbTilesTileSource(new SQLiteConnectionString(path, true));
+            var mbTilesLayer = new TileLayer(mbTilesTileSource);
+            return mbTilesLayer;
         }
     }
 }
