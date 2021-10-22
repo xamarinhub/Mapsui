@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Linq;
 using System.Net;
 using Mapsui.Fetcher;
 using Mapsui.Layers;
@@ -11,15 +10,20 @@ using Mapsui.Rendering;
 using Mapsui.Rendering.Skia;
 using Mapsui.Widgets;
 using System.Runtime.CompilerServices;
+using Mapsui.Utilities;
 
-#if __ANDROID__
+#if __UWP__
+namespace Mapsui.UI.Uwp
+#elif __ANDROID__
 namespace Mapsui.UI.Android
 #elif __IOS__
 namespace Mapsui.UI.iOS
-#elif __UWP__
-namespace Mapsui.UI.Uwp
+#elif __WINUI__
+namespace Mapsui.UI.WinUI
 #elif __FORMS__
 namespace Mapsui.UI.Forms
+#elif __AVALONIA__
+namespace Mapsui.UI.Avalonia
 #else
 namespace Mapsui.UI.Wpf
 #endif
@@ -28,6 +32,154 @@ namespace Mapsui.UI.Wpf
     {
         private Map _map;
         private double _unSnapRotationDegrees;
+        // Flag indicating if a drawing process is running
+        private bool _drawing;
+        // Flag indicating if a new drawing process should start
+        private bool _refresh;
+        // Action to call for a redraw of the control
+        private Action _invalidate;
+        // Timer for loop to invalidating the control
+        private System.Threading.Timer _invalidateTimer;
+        // Interval between two calls of the invalidate function in ms
+        private int _updateInterval = 16;
+        // Stopwatch for measuring drawing times
+        private readonly System.Diagnostics.Stopwatch _stopwatch = new System.Diagnostics.Stopwatch();
+
+        void CommonInitialize()
+        {
+            // Create map
+            Map = new Map();
+            // Create timer for invalidating the control
+            _invalidateTimer = new System.Threading.Timer(InvalidateTimerCallback, null, System.Threading.Timeout.Infinite, 16);
+            // Start the invalidation timer
+            StartUpdates(false);
+        }
+
+        void CommonDrawControl(object canvas)
+        {
+            if (_drawing)
+                return;
+            if (Renderer == null) 
+                return;
+            if (_map == null) 
+                return;
+            if (!Viewport.HasSize) 
+                return;
+
+            // Start drawing
+            _drawing = true;
+
+            // Start stopwatch before updating animations and drawing control
+            _stopwatch.Restart();
+
+            // All requested updates up to this point will be handled by this redraw
+            _refresh = false;
+            Navigator.UpdateAnimations();
+            Renderer.Render(canvas, new Viewport(Viewport), _map.Layers, _map.Widgets, _map.BackColor);
+
+            // Stop stopwatch after drawing control
+            _stopwatch.Stop();
+
+            // If we are interested in performance measurements, we save the new drawing time
+            _performance?.Add(_stopwatch.Elapsed.TotalMilliseconds);
+
+            // Log drawing time
+            Logger.Log(LogLevel.Information, $"Time for drawing control [ms]: {_stopwatch.Elapsed.TotalMilliseconds}");
+
+            // End drawing
+            _drawing = false;
+        }
+
+        void InvalidateTimerCallback(object state)
+        {
+            if (!_refresh)
+                return;
+
+            if (_drawing)
+            {
+                if (_performance != null)
+                    _performance.Dropped++;
+
+                return;
+            }
+
+            _invalidate?.Invoke();
+        }
+
+        /// <summary>
+        /// Start updates for control
+        /// </summary>
+        /// <remarks>
+        /// When this function is called, the control is redrawn if needed
+        /// </remarks>
+        public void StartUpdates(bool refresh = true)
+        {
+            _refresh = refresh;
+            _invalidateTimer.Change(0, _updateInterval);
+        }
+
+        /// <summary>
+        /// Stop updates for control
+        /// </summary>
+        /// <remarks>
+        /// When this function is called, the control stops to redraw itself, 
+        /// even if it is needed
+        /// </remarks>
+        public void StopUpdates()
+        {
+            _invalidateTimer.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+        }
+
+        /// <summary>
+        /// Force a update of control
+        /// </summary>
+        /// <remarks>
+        /// When this function is called, the control draws itself once 
+        /// </remarks>
+        public void ForceUpdate()
+        {
+            _invalidate?.Invoke();
+        }
+
+        /// <summary>
+        /// Interval between two redraws of the MapControl in ms
+        /// </summary>
+        public int UpdateInterval
+        {
+            get => _updateInterval;
+            set
+            {
+                if (value <= 0)
+                    throw new ArgumentOutOfRangeException($"{nameof(UpdateInterval)} must be greater than 0");
+
+                if (_updateInterval != value)
+                {
+                    _updateInterval = value;
+                    StartUpdates();
+                }
+            }
+        }
+
+        private Performance _performance;
+
+        /// <summary>
+        /// Object to save performance information about the drawing of the map
+        /// </summary>
+        /// <remarks>
+        /// If this is null, no performance information is saved.
+        /// </remarks>
+        public Performance Performance
+        {
+            get { return _performance; }
+            set
+            {
+                if (_performance != value)
+                {
+                    _performance = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
 
         /// <summary>
         /// After how many degrees start rotation to take place
@@ -63,6 +215,11 @@ namespace Mapsui.UI.Wpf
             }
         }
 
+        public float PixelDensity
+        {
+            get => GetPixelDensity();
+        }
+
         private IRenderer _renderer = new MapRenderer();
 
         /// <summary>
@@ -95,17 +252,21 @@ namespace Mapsui.UI.Wpf
         public INavigator Navigator
         {
             get => _navigator;
-            private set
+            set
             {
+                if (_navigator != null)
+                {
+                    _navigator.Navigated -= Navigated;
+                }
                 _navigator = value ?? throw new ArgumentException($"{nameof(Navigator)} can not be null");
                 _navigator.Navigated += Navigated;
             }
         }
 
-        private void Navigated(object sender, EventArgs e)
+        private void Navigated(object sender, ChangeType changeType)
         {
             _map.Initialized = true;
-            Refresh();
+            Refresh(changeType);
         }
 
         /// <summary>
@@ -114,7 +275,8 @@ namespace Mapsui.UI.Wpf
         public event EventHandler ViewportInitialized; //todo: Consider to use the Viewport PropertyChanged
 
         /// <summary>
-        /// Called whenever a feature in one of the layers in InfoLayers is hitten by a click 
+        /// Called whenever the map is clicked. The MapInfoEventArgs contain the features that were hit in
+        /// the layers that have IsMapInfoLayer set to true. 
         /// </summary>
         public event EventHandler<MapInfoEventArgs> Info;
 
@@ -156,7 +318,7 @@ namespace Mapsui.UI.Wpf
         }
 
         /// <summary>
-        /// Unsubcribe from map events
+        /// Unsubscribe from map events
         /// </summary>
         /// <param name="map">Map, to which events to unsubscribe</param>
         private void UnsubscribeFromMapEvents(Map map)
@@ -173,10 +335,15 @@ namespace Mapsui.UI.Wpf
         /// <summary>
         /// Refresh data of the map and than repaint it
         /// </summary>
-        public void Refresh()
+        public void Refresh(ChangeType changeType = ChangeType.Discrete)
         {
-            RefreshData();
+            RefreshData(changeType);
             RefreshGraphics();
+        }
+
+        public void RefreshGraphics()
+        {
+            _refresh = true;
         }
 
         private void MapDataChanged(object sender, DataChangedEventArgs e)
@@ -310,15 +477,16 @@ namespace Mapsui.UI.Wpf
         /// <summary>
         /// Refresh data of Map, but don't paint it
         /// </summary>
-        public void RefreshData()
+        public void RefreshData(ChangeType changeType = ChangeType.Discrete)
         {
-            _map?.RefreshData(Viewport.Extent, Viewport.Resolution, true);
+            _map?.RefreshData(Viewport.Extent, Viewport.Resolution, changeType);
         }
 
         private void OnInfo(MapInfoEventArgs mapInfoEventArgs)
         {
             if (mapInfoEventArgs == null) return;
 
+            Map?.OnInfo(mapInfoEventArgs); // Also propagate to Map
             Info?.Invoke(this, mapInfoEventArgs);
         }
 
@@ -339,8 +507,21 @@ namespace Mapsui.UI.Wpf
         /// <inheritdoc />
         public MapInfo GetMapInfo(Point screenPosition, int margin = 0)
         {
-            return MapInfoHelper.GetMapInfo(Map.Layers.Where(l => l.IsMapInfoLayer).ToList(), Viewport,
-                screenPosition, Renderer.SymbolCache, margin);
+            return Renderer.GetMapInfo(screenPosition.X, screenPosition.Y, Viewport, Map.Layers, margin);
+        }
+
+        /// <inheritdoc />
+        public byte[] GetSnapshot(IEnumerable<ILayer> layers = null)
+        {
+            byte[] result = null;
+            
+            using (var stream = Renderer.RenderToBitmapStream(Viewport, layers ?? Map.Layers, pixelDensity: PixelDensity)) 
+            { 
+                if (stream != null)
+                    result = stream.ToArray(); 
+            }
+
+            return result;
         }
 
         /// <summary>
@@ -353,12 +534,9 @@ namespace Mapsui.UI.Wpf
         private MapInfoEventArgs InvokeInfo(Point screenPosition, Point startScreenPosition, int numTaps)
         {
             return InvokeInfo(
-                Map.Layers.Where(l => l.IsMapInfoLayer).ToList(), 
                 Map.GetWidgetsOfMapAndLayers(), 
-                Viewport,
                 screenPosition, 
                 startScreenPosition, 
-                _renderer.SymbolCache, 
                 WidgetTouched, 
                 numTaps);
         }
@@ -366,24 +544,17 @@ namespace Mapsui.UI.Wpf
         /// <summary>
         /// Check if a widget or feature at a given screen position is clicked/tapped
         /// </summary>
-        /// <param name="layers">The layers to query for MapInfo</param>
         /// <param name="widgets">The Map widgets</param>
-        /// <param name="viewport">The current Viewport</param>
         /// <param name="screenPosition">Screen position to check for widgets and features</param>
         /// <param name="startScreenPosition">Screen position of Viewport/MapControl</param>
-        /// <param name="symbolCache">Cache for symbols to determine size</param>
         /// <param name="widgetCallback">Callback, which is called when Widget is hit</param>
         /// <param name="numTaps">Number of clickes/taps</param>
         /// <returns>True, if something done </returns>
-        private static MapInfoEventArgs InvokeInfo(IEnumerable<ILayer> layers, IEnumerable<IWidget> widgets, 
-            IReadOnlyViewport viewport, Point screenPosition, Point startScreenPosition, ISymbolCache symbolCache,
-            Func<IWidget, Point, bool> widgetCallback, int numTaps)
+        private MapInfoEventArgs InvokeInfo(IEnumerable<IWidget> widgets, Point screenPosition, 
+            Point startScreenPosition, Func<IWidget, Point, bool> widgetCallback, int numTaps)
         {
-            var layerWidgets = layers.Select(l => l.Attribution).Where(a => a != null);
-            var allWidgets = layerWidgets.Concat(widgets).ToList(); // Concat layer widgets and map widgets.
-
-            // First check if a Widget is clicked. In the current design they are always on top of the map.
-            var touchedWidgets = WidgetTouch.GetTouchedWidget(screenPosition, startScreenPosition, allWidgets);
+            // Check if a Widget is tapped. In the current design they are always on top of the map.
+            var touchedWidgets = WidgetTouch.GetTouchedWidget(screenPosition, startScreenPosition, widgets);
 
             foreach (var widget in touchedWidgets)
             {
@@ -398,7 +569,8 @@ namespace Mapsui.UI.Wpf
                 }
             }
         
-            var mapInfo = MapInfoHelper.GetMapInfo(layers, viewport, screenPosition, symbolCache);
+            // Check which features in the map were tapped.
+            var mapInfo = Renderer.GetMapInfo(screenPosition.X, screenPosition.Y, Viewport, Map.Layers);
 
             if (mapInfo != null)
             {

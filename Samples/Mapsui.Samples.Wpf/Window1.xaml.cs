@@ -5,7 +5,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using Mapsui.Extensions;
 using Mapsui.Logging;
+using Mapsui.Providers;
 using Mapsui.Samples.CustomWidget;
 using Mapsui.Samples.Wpf.Utilities;
 using Mapsui.UI;
@@ -19,6 +21,9 @@ namespace Mapsui.Samples.Wpf
         public Window1()
         {
             InitializeComponent();
+
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
             MapControl.FeatureInfo += MapControlFeatureInfo;
             MapControl.MouseMove += MapControlOnMouseMove;
             MapControl.Map.RotationLock = false;
@@ -29,23 +34,12 @@ namespace Mapsui.Samples.Wpf
             Logger.LogDelegate += LogMethod;
 
             CategoryComboBox.SelectionChanged += CategoryComboBoxSelectionChanged;
-            RenderMode.SelectionChanged += RenderModeOnSelectionChanged;
-
+            
             FillComboBoxWithCategories();
             FillListWithSamples();
         }
         
-        private void RenderModeOnSelectionChanged(object sender, SelectionChangedEventArgs selectionChangedEventArgs)
-        {
-            var selectedValue = ((ComboBoxItem)((ComboBox)sender).SelectedItem).Content.ToString();
 
-            if (selectedValue.ToLower().Contains("wpf"))
-                MapControl.RenderMode = UI.Wpf.RenderMode.Wpf;
-            else if (selectedValue.ToLower().Contains("skia"))
-                MapControl.RenderMode = UI.Wpf.RenderMode.Skia;
-            else
-                throw new Exception("Unknown ComboBox item");
-        }
 
         private void MapControlOnMouseMove(object sender, MouseEventArgs e)
         {
@@ -74,7 +68,7 @@ namespace Mapsui.Samples.Wpf
         private void FillComboBoxWithCategories()
         {
             // todo: find proper way to load assembly
-            WmsSample.LoadAssembly();
+            DesktopSamplesUtilities.LoadAssembly();
             Tests.Common.Utilities.LoadAssembly();
 
             var categories = AllSamples.GetSamples().Select(s => s.Category).Distinct().OrderBy(c => c);
@@ -143,8 +137,16 @@ namespace Mapsui.Samples.Wpf
 
         private void MapControlOnInfo(object sender, MapInfoEventArgs args)
         {
-            if (args.MapInfo.Feature != null)
+            if (args.MapInfo?.Feature != null)
+            {
+                FeatureInfoBorder.Visibility = Visibility.Visible;
                 FeatureInfo.Text = $"Click Info:{Environment.NewLine}{args.MapInfo.Feature.ToDisplayText()}";
+            }
+            else
+            {
+                FeatureInfoBorder.Visibility = Visibility.Collapsed;
+            }
+
         }
     }
 }

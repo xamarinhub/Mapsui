@@ -33,6 +33,11 @@ namespace Mapsui.Styles
         public float[] DashArray { get; set; } = null;
 
         /// <summary>
+        /// Offset for drawing user defined dashes
+        /// </summary>
+        public float DashOffset { get; set; } = 0;
+
+        /// <summary>
         /// Defines the end of a line
         /// </summary>
         public PenStrokeCap PenStrokeCap { get; set; } = PenStrokeCap.Butt;
@@ -40,7 +45,7 @@ namespace Mapsui.Styles
         /// <summary>
         /// Defines how line parts are join together
         /// </summary>
-        public StrokeJoin StrokeJoin { get; set; } = StrokeJoin.Miter;
+        public StrokeJoin StrokeJoin { get; set; } = StrokeJoin.Round;
 
         /// <summary>
         /// Defines up to which width of line StrokeJoin is used
@@ -49,11 +54,11 @@ namespace Mapsui.Styles
 
         public override bool Equals(object obj)
         {
-            if (!(obj is Pen))
+            if (!(obj is Pen pen))
             {
                 return false;
             }
-            return Equals((Pen)obj);
+            return Equals(pen);
         }
 
         public bool Equals(Pen pen)
@@ -69,6 +74,8 @@ namespace Mapsui.Styles
             if (PenStyle != pen.PenStyle) return false;
 
             if (DashArray != pen.DashArray) return false;
+
+            if (DashOffset != pen.DashOffset) return false;
 
             if (PenStrokeCap != pen.PenStrokeCap) return false;
 

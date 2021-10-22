@@ -2,6 +2,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <Authors>Mapsui Contributers</Authors>
+    <RuntimeIdentifiers>win10-x86;win10-x64;win10-arm64</RuntimeIdentifiers>
   </PropertyGroup>
   <ItemGroup>
     <None Remove="EmbeddedResources\cities.geojson" />
@@ -58,15 +59,10 @@
     </Content>
   </ItemGroup>
 
-  <ItemGroup><!--<PackageReference Include="" Version=""/>-->
-  
-    <Folder Include="Properties\" />
-  </ItemGroup>
-
   <ItemGroup>
-    <PackageReference Include="BruTile" Version="2.0.2" />
-    <PackageReference Include="BruTile.MbTiles" Version="2.0.2" />
-    <PackageReference Include="Newtonsoft.Json" Version="11.0.2" />
+    <PackageReference Include="BruTile" Version="4.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
+    <PackageReference Include="BruTile.MbTiles" Version="4.0.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -75,8 +71,14 @@
     <ProjectReference Include="..\Mapsui.Samples.CustomWidget\Mapsui.Samples.CustomWidget.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="MbTiles\chinese-world.mbtiles">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <PropertyGroup>
-    <DebugType>full</DebugType>
+    <DebugType>portable</DebugType>
   </PropertyGroup>
 
 </Project>

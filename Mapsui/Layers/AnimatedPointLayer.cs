@@ -8,15 +8,15 @@ namespace Mapsui.Layers
 {
     public class AnimatedPointLayer : BaseLayer
     {
-        private readonly IProvider _dataSource;
+        private readonly IProvider<IGeometryFeature> _dataSource;
         private BoundingBox _extent;
         private double _resolution;
-        private readonly AnimatedFeatures _animatedFeatures = new AnimatedFeatures();
+        private readonly AnimatedFeatures _animatedFeatures = new();
 
-        public AnimatedPointLayer(IProvider dataSource)
+        public AnimatedPointLayer(IProvider<IGeometryFeature> dataSource)
         {
             _dataSource = dataSource;
-            _animatedFeatures.AnimatedPositionChanged += (sender, args) => OnDataChanged(new DataChangedEventArgs());
+            _animatedFeatures.AnimatedPositionChanged += (_, _) => OnDataChanged(new DataChangedEventArgs());
         }
 
         public void UpdateData()
@@ -37,7 +37,7 @@ namespace Mapsui.Layers
         {
             return _animatedFeatures.GetFeatures();
         }
-        public override void RefreshData(BoundingBox extent, double resolution, bool majorChange)
+        public override void RefreshData(BoundingBox extent, double resolution, ChangeType changeType)
         {
             _extent = extent;
             _resolution = resolution;

@@ -1,14 +1,14 @@
-﻿using Mapsui.Samples.Common;
-using Mapsui.Samples.Common.Maps;
+﻿using Mapsui.Providers;
+using Mapsui.Samples.Common;
+using Mapsui.Samples.CustomWidget;
 using Mapsui.UI.Forms;
-using Mapsui.UI.Objects;
 using Plugin.Geolocator;
 using Plugin.Geolocator.Abstractions;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Reflection;
+using Mapsui.Extensions;
+using Mapsui.Styles;
 using Xamarin.Forms;
 using Xamarin.Forms.Xaml;
 
@@ -27,10 +27,7 @@ namespace Mapsui.Samples.Forms
             allSamples = AllSamples.GetSamples();
 
             var categories = allSamples.Select(s => s.Category).Distinct().OrderBy(c => c);
-            foreach (var category in categories)
-            {
-                picker.Items?.Add(category);
-            }
+            picker.ItemsSource = categories.ToList<string>();
             picker.SelectedIndexChanged += PickerSelectedIndexChanged;
             picker.SelectedItem = "Forms";
 
@@ -43,11 +40,39 @@ namespace Mapsui.Samples.Forms
 
             mapView.MyLocationLayer.UpdateMyLocation(new UI.Forms.Position());
 
-            mapView.IsZoomButtonVisible = true;
-            mapView.IsMyLocationButtonVisible = true;
-            mapView.IsNorthingButtonVisible = true;
+            mapView.Info += MapView_Info;
+            mapView.Renderer.WidgetRenders[typeof(CustomWidget.CustomWidget)] = new CustomWidgetSkiaRenderer();
 
             StartGPS();
+        }
+
+        protected override void OnAppearing()
+        {
+            mapView.Refresh();
+        }
+
+        private void MapView_Info(object sender, UI.MapInfoEventArgs e)
+        {
+            if (e.MapInfo.Feature is IGeometryFeature geometryFeature)
+            {
+                featureInfo.Text = $"Click Info:";
+
+                if (e?.MapInfo?.Feature != null)
+                {
+                    featureInfo.Text = $"Click Info:{Environment.NewLine}{geometryFeature.ToDisplayText()}";
+
+                    foreach (var style in e.MapInfo.Feature.Styles)
+                    {
+                        if (style is CalloutStyle)
+                        {
+                            style.Enabled = !style.Enabled;
+                            e.Handled = true;
+                        }
+                    }
+
+                    mapView.Refresh();
+                }
+            }
         }
 
         private void FillListWithSamples()
@@ -99,7 +124,10 @@ namespace Mapsui.Samples.Forms
                     e.Pin.IsVisible = false;
                 }
                 if (e.NumOfTaps == 1)
-                    e.Pin.IsCalloutVisible = !e.Pin.IsCalloutVisible;
+                    if (e.Pin.Callout.IsVisible)
+                        e.Pin.HideCallout();
+                    else
+                        e.Pin.ShowCallout();
             }
 
             e.Handled = true;

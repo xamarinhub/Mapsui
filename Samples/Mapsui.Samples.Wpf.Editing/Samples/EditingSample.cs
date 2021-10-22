@@ -38,7 +38,7 @@ namespace Mapsui.Samples.Wpf.Editing.Samples
         {
             // The edit layer has two styles. That is why it needs to use a StyleCollection.
             // In a future version of Mapsui the ILayer will have a Styles collections just
-            // as the IFeature has right now.
+            // as the IGeometryFeature has right now.
             // The first style is the basic style of the features in edit mode.
             // The second style is the way to show a feature is selected.
             return new StyleCollection
@@ -50,8 +50,6 @@ namespace Mapsui.Samples.Wpf.Editing.Samples
 
         private static IStyle CreateEditLayerBasicStyle()
         {
-            // Note: VectorStyle does not function in the current release Mapsui version.
-            // You need the package deployed from the build server.
             var editStyle = new VectorStyle
             {
                 Fill = new Brush(EditModeColor),
@@ -73,12 +71,13 @@ namespace Mapsui.Samples.Wpf.Editing.Samples
             Outline = new Pen(Color.Red, 3),
             Line = new Pen(Color.Red, 3)
         };
+
         private static readonly SymbolStyle DisableStyle = new SymbolStyle { Enabled = false };
 
         private static IStyle CreateSelectedStyle()
         {
-            // The selected style use a ThemeStyle which takes a method to determing the style based
-            // on the feature. In this case is checks it the "Selected" field is set to true.
+            // To show the selected style a ThemeStyle is used which switches on and off the SelectedStyle
+            // depending on a "Selected" attribute.
             return new ThemeStyle(f => (bool?)f["Selected"] == true ? SelectedStyle : DisableStyle);
         }
 

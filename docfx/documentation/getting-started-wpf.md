@@ -1,30 +1,28 @@
 
 # Mapsui WPF getting started
 
-This page will show the steps to add a Mapsui map to your WPF application.
-
 ### Step 1
 Start a new WPF application in Visual Studio.
 
 ### Step 2
 In the package manager console type:
-```
-PM> Install-Package Mapsui
+```console
+PM> Install-Package Mapsui.Wpf -pre
 ```
 
 ### Step 3
 In WpfApplication1.MainWindow.xaml add this in the Grid element:
+```xml
+<mapsui:MapControl Name="MyMapControl"></mapsui:MapControl>
 ```
-<xaml:MapControl Name="MyMapControl"></xaml:MapControl>
-```
-And add the namespace: ```xmlns:xaml="clr-namespace:Mapsui.UI.Wpf;assembly=Mapsui.UI.Wpf"```
+And add the namespace: ```xmlns:mapsui="clr-namespace:Mapsui.UI.Wpf;assembly=Mapsui.UI.Wpf"```
 
 ### Step 4
-In WpfApplication1.MainWindow.xaml.cs add in the constructor:
+In WpfApplication1.MainWindow.xaml.cs add in the constructor **after** InitializeComponent():
+```csharp
+MyMapControl.Map.Layers.Add(OpenStreetMap.CreateTileLayer());
 ```
-MyMapControl.Map.Layers.Add(new TileLayer(KnownTileSources.Create()));
-```
-And add the namespaces: ```using BruTile.Predefined; using Mapsui.Layers; ```
+And add the namespaces: ```using Mapsui.Utilities; using Mapsui.Layers; ```
 
 ### Step 5
-Run!
+Run it and you should see a map of the world.

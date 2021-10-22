@@ -36,7 +36,7 @@ namespace Mapsui.Fetcher
             while (cancellationTokenSource != null && !cancellationTokenSource.Token.IsCancellationRequested)
             {
                 Action method = null;
-                
+
                 if (_fetchDispatcher.TryTake(ref method))
                 {
                     method();

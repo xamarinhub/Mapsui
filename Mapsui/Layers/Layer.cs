@@ -17,31 +17,34 @@
 // along with SharpMap; if not, write to the Free Software
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
 
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
+using Mapsui.Extensions;
 using Mapsui.Fetcher;
 using Mapsui.Geometries;
 using Mapsui.Providers;
 using Mapsui.Utilities;
 
 // todo: Use Transformer only to translate between provider and cache. Layer only interacts with cache.
-// todo: Put the datasource envelop in the cache (it should not just be the envelope of the cached data, but all data in datasource). 
+// todo: Put the dataSource envelop in the cache (it should not just be the envelope of the cached data, but all data in dataSource). 
 
 namespace Mapsui.Layers
 {
-    public class Layer : BaseLayer, IAsyncDataFetcher
+    public class Layer: BaseLayer, IAsyncDataFetcher
     {
-        private IProvider _dataSource;
-        private readonly object _syncRoot = new object();
-        private readonly MemoryProvider _cache = new MemoryProvider();
-        private readonly FeatureFetchDispatcher _fetchDispatcher;
+        private IProvider<IFeature> _dataSource;
+        private readonly object _syncRoot = new();
+        private readonly ConcurrentStack<IFeature> _cache = new();
+        private readonly FeatureFetchDispatcher<IFeature> _fetchDispatcher;
         private readonly FetchMachine _fetchMachine;
-        private readonly Delayer _delayer = new Delayer();
+        public Delayer Delayer { get; } = new();
 
         /// <summary>
         /// Create a new layer
         /// </summary>
-        public Layer() : this("Layer") {}
+        public Layer() : this("Layer") { }
 
         /// <summary>
         /// Create layer with name
@@ -49,7 +52,7 @@ namespace Mapsui.Layers
         /// <param name="layername">Name to use for layer</param>
         public Layer(string layername) : base(layername)
         {
-            _fetchDispatcher = new FeatureFetchDispatcher(_cache, Transformer);
+            _fetchDispatcher = new FeatureFetchDispatcher<IFeature>(_cache, Transformer);
             _fetchDispatcher.DataChanged += FetchDispatcherOnDataChanged;
             _fetchDispatcher.PropertyChanged += FetchDispatcherOnPropertyChanged;
 
@@ -59,12 +62,15 @@ namespace Mapsui.Layers
         /// <summary>
         /// Time to wait before fetching data
         /// </summary>
-        public int FetchingPostponedInMilliseconds { get; set; } = 500;
-
+        public int FetchingPostponedInMilliseconds
+        {
+            get => Delayer.MillisecondsToWait;
+            set => Delayer.MillisecondsToWait = value;
+        }
         /// <summary>
         /// Data source for this layer
         /// </summary>
-        public IProvider DataSource
+        public IProvider<IFeature> DataSource
         {
             get => _dataSource;
             set
@@ -73,7 +79,7 @@ namespace Mapsui.Layers
 
                 _dataSource = value;
                 ClearCache();
-                
+
                 if (_dataSource != null)
                 {
                     Transformer.FromCRS = _dataSource?.CRS;
@@ -103,7 +109,7 @@ namespace Mapsui.Layers
             _fetchDispatcher.SetViewport(extent, resolution);
             _fetchMachine.Start();
         }
-        
+
         /// <summary>
         /// Returns the extent of the layer
         /// </summary>
@@ -122,7 +128,7 @@ namespace Mapsui.Layers
         /// <inheritdoc />
         public override IEnumerable<IFeature> GetFeaturesInView(BoundingBox extent, double resolution)
         {
-            return _cache.Features;
+            return _cache.ToList();
         }
 
         /// <inheritdoc />
@@ -138,13 +144,15 @@ namespace Mapsui.Layers
         }
 
         /// <inheritdoc />
-        public override void RefreshData(BoundingBox extent, double resolution, bool majorChange)
+        public override void RefreshData(BoundingBox extent, double resolution, ChangeType changeType)
         {
             if (!Enabled) return;
+            if (MinVisible > resolution) return;
+            if (MaxVisible < resolution) return;
             if (DataSource == null) return;
-            if (!majorChange) return;
+            if (changeType == ChangeType.Continuous) return;
 
-            _delayer.ExecuteDelayed(() => DelayedFetch(extent.Copy(), resolution), FetchingPostponedInMilliseconds);
+            Delayer.ExecuteDelayed(() => DelayedFetch(extent.Copy(), resolution));
         }
 
         /// <inheritdoc />

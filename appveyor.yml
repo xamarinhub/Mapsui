@@ -6,7 +6,7 @@ skip_commits:
     - docfx/**/*
     - logo/**/*
     - '**/*.md'
-image: Visual Studio 2017
+image: Visual Studio 2019
 assembly_info:
   patch: true
   file: '**\AssemblyInfo.*'
@@ -14,9 +14,11 @@ assembly_info:
   assembly_file_version: '{version}'
   assembly_informational_version: '{version}'
 environment:
-  version-short: 2.0.0
+  version-short: 3.0.0  
 nuget:
   disable_publish_on_pr: true
+install:
+- cmd: '"C:/Program Files (x86)/Android/android-sdk/tools/bin/sdkmanager.bat" "platforms;android-30"'
 before_build:
 - cmd: nuget restore mapsui.sln
 build:
@@ -37,3 +39,5 @@ deploy:
     secure: RI7FmOMHYqZPtJNhuBD/dxzizoFBECO++GnXPQVBqMmIIkL4ZYCPMGGFP3hTQC2Q
   skip_symbols: true
   artifact: mapsuipackage-nu-even-niet
+configuration: Release
+platform: AnyCPU

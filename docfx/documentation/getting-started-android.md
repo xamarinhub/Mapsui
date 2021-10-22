@@ -1,4 +1,4 @@
-## Mapsui Android getting started
+# Mapsui Android getting started
 
 ### Step 1
 
@@ -6,7 +6,10 @@ Create 'Blank App (Android)' in Visual Studio
 
 ### Step 2
 
-$ Install-Package Mapsui
+In the package manager console type:
+```
+PM> Install-Package Mapsui.Android -pre
+```
 
 ### Step 3
 
@@ -54,5 +57,5 @@ using Mapsui.UI.Android;
 ```
 
 
-### Step 5: 
-Run!
+### Step 5:
+Run it and you should see a map of the world.

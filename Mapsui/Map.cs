@@ -16,6 +16,7 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -37,7 +38,7 @@ namespace Mapsui
     /// </remarks>
     public class Map : INotifyPropertyChanged, IMap
     {
-        private LayerCollection _layers = new LayerCollection();
+        private LayerCollection _layers = new();
         private Color _backColor = Color.White;
         private IViewportLimiter _limiter = new ViewportLimiter();
 
@@ -73,7 +74,7 @@ namespace Mapsui
         /// <summary>
         /// List of Widgets belonging to map
         /// </summary>
-        public List<IWidget> Widgets { get; } = new List<IWidget>();
+        public ConcurrentQueue<IWidget> Widgets { get; } = new();
 
         /// <summary>
         /// Limit the extent to which the user can navigate
@@ -111,13 +112,10 @@ namespace Mapsui
             {
                 var tempLayers = _layers;
                 if (tempLayers != null)
-                {
-                    _layers.LayerAdded -= LayersLayerAdded;
-                    _layers.LayerRemoved -= LayersLayerRemoved;
-                }
+                    _layers.Changed -= LayersCollectionChanged;
+
                 _layers = value;
-                _layers.LayerAdded += LayersLayerAdded;
-                _layers.LayerRemoved += LayersLayerRemoved;
+                _layers.Changed += LayersCollectionChanged;
             }
         }
 
@@ -180,11 +178,12 @@ namespace Mapsui
         public event EventHandler RefreshGraphics;
 #pragma warning restore 67
 
-        [Obsolete("Use MapControl.Info instead", true)]
-#pragma warning disable 67
+        /// <summary>
+        /// Called whenever the map is clicked. The MapInfoEventArgs contain the features that were hit in
+        /// the layers that have IsMapInfoLayer set to true. 
+        /// </summary>
         public event EventHandler<MapInfoEventArgs> Info;
-#pragma warning restore 67
-
+        
         [Obsolete("Use your own hover event instead and call MapControl.GetMapInfo", true)]
 #pragma warning disable 67
         public event EventHandler<MapInfoEventArgs> Hover;
@@ -212,37 +211,46 @@ namespace Mapsui
             }
         }
 
-        public void RefreshData(BoundingBox extent, double resolution, bool majorChange)
+        public void RefreshData(BoundingBox extent, double resolution, ChangeType changeType)
         {
             foreach (var layer in _layers.ToList())
             {
-                layer.RefreshData(extent, resolution, majorChange);
+                layer.RefreshData(extent, resolution, changeType);
             }
         }
+        
+        private void LayersCollectionChanged(object sender, LayerCollectionChangedEventArgs args)
+        {
+            foreach (var layer in args.RemovedLayers ?? Enumerable.Empty<ILayer>())
+                LayerRemoved(layer);
 
-        private void LayersLayerAdded(ILayer layer)
+            foreach (var layer in args.AddedLayers ?? Enumerable.Empty<ILayer>())
+                LayerAdded(layer);
+
+            LayersChanged();
+        }
+
+        private void LayerAdded(ILayer layer)
         {
             layer.DataChanged += LayerDataChanged;
             layer.PropertyChanged += LayerPropertyChanged;
 
             layer.Transformation = Transformation;
             layer.CRS = CRS;
-            Resolutions = DetermineResolutions(Layers);
-            OnPropertyChanged(nameof(Layers));
         }
 
-        private void LayersLayerRemoved(ILayer layer)
+        private void LayerRemoved(ILayer layer)
         {
             if (layer is IAsyncDataFetcher asyncLayer)
-            {
                 asyncLayer.AbortFetch();
-            }
 
             layer.DataChanged -= LayerDataChanged;
             layer.PropertyChanged -= LayerPropertyChanged;
+        }
 
+        private void LayersChanged()
+        {
             Resolutions = DetermineResolutions(Layers);
-
             OnPropertyChanged(nameof(Layers));
         }
 
@@ -309,7 +317,19 @@ namespace Mapsui
 
         public IEnumerable<IWidget> GetWidgetsOfMapAndLayers()
         {
-            return Widgets.Concat(Layers.Select(l => l.Attribution)).Where(w => w != null).ToList();
+            return Widgets.Concat(Layers.Where(l => l.Enabled).Select(l => l.Attribution))
+                .Where(a => a != null && a.Enabled).ToList();
+        }
+
+        /// <summary>
+        /// This method is to invoke the Info event from the Map. This method is called
+        /// by the MapControl/MapView and should usually not be called from user code.
+        /// </summary>
+        public void OnInfo(MapInfoEventArgs mapInfoEventArgs)
+        {
+            if (mapInfoEventArgs == null) return;
+
+            Info?.Invoke(this, mapInfoEventArgs);
         }
     }
 }

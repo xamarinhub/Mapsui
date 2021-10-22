@@ -26,9 +26,14 @@ namespace Mapsui.Utilities
         {
             if (resolutions == null || resolutions.Count == 0) return resolution / 2.0;
 
-            foreach (var r in resolutions)
-                if (r < resolution) return r;
-            return resolutions[resolutions.Count - 1];
+            foreach (var t in resolutions)
+            {
+                // If there is a smaller resolution in the array return it
+                if (t < resolution - double.Epsilon) return t;
+            }
+
+            // Else return half of the current resolution
+            return resolution / 2.0;
         }
         
         public static double ZoomOut(IReadOnlyList<double> resolutions, double resolution)
@@ -36,8 +41,13 @@ namespace Mapsui.Utilities
             if (resolutions == null || resolutions.Count == 0) return resolution * 2.0;
 
             for (var i = resolutions.Count - 1; i >= 0; i--)
-                if (resolutions[i] > resolution) return resolutions[i];
-            return resolutions[0];
+            {
+                // If there is a bigger resolution in the array return it
+                if (resolutions[i] > (resolution + double.Epsilon)) return resolutions[i];
+            }
+
+            // Else return double the current resolution
+            return resolution * 2.0;
         }
 
         [Obsolete("Use ViewportLimiter.LimitExtent instead")]
@@ -113,9 +123,7 @@ namespace Mapsui.Utilities
         
         private static void Swap(ref double xMin, ref double xMax)
         {
-            var tempX = xMin;
-            xMin = xMax;
-            xMax = tempX;
+            (xMin, xMax) = (xMax, xMin);
         }
     }
 

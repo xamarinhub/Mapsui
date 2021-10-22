@@ -1,8 +1,9 @@
 ﻿using Mapsui.Layers;
-using Mapsui.Rendering;
 using Mapsui.UI.Forms.Extensions;
 using Mapsui.UI.Objects;
+using Mapsui.Widgets;
 using SkiaSharp;
+using Svg.Skia;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -11,6 +12,9 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Mapsui.Extensions;
+using Mapsui.Providers;
+using Mapsui.Widgets.ButtonWidget;
 using Xamarin.Forms;
 
 namespace Mapsui.UI.Forms
@@ -18,28 +22,27 @@ namespace Mapsui.UI.Forms
     /// <summary>
     /// Class, that uses the API of the original Xamarin.Forms MapView
     /// </summary>
-    public class MapView : ContentView, IMapControl, INotifyPropertyChanged, IEnumerable<Pin>
+    public class MapView : MapControl, INotifyPropertyChanged, IEnumerable<Pin>
     {
-        internal MapControl _mapControl;
-
-        private readonly MyLocationLayer _mapMyLocationLayer;
+        private const string CalloutLayerName = "Callouts";
         private const string PinLayerName = "Pins";
         private const string DrawableLayerName = "Drawables";
+        private readonly MemoryLayer _mapCalloutLayer;
         private readonly MemoryLayer _mapPinLayer;
         private readonly MemoryLayer _mapDrawableLayer;
-        private readonly StackLayout _mapButtons;
-        private readonly SvgButton _mapZoomInButton;
-        private readonly SvgButton _mapZoomOutButton;
-        private readonly Image _mapSpacingButton1;
-        private readonly SvgButton _mapMyLocationButton;
-        private readonly Image _mapSpacingButton2;
-        private readonly SvgButton _mapNorthingButton;
+        private ButtonWidget _mapZoomInButton;
+        private ButtonWidget _mapZoomOutButton;
+        private ButtonWidget _mapMyLocationButton;
+        private ButtonWidget _mapNorthingButton;
         private readonly SKPicture _pictMyLocationNoCenter;
         private readonly SKPicture _pictMyLocationCenter;
+        private readonly SKPicture _pictZoomIn;
+        private readonly SKPicture _pictZoomOut;
+        private readonly SKPicture _pictNorthing;
 
-        readonly ObservableCollection<Pin> _pins = new ObservableCollection<Pin>();
-        readonly ObservableCollection<Drawable> _drawable = new ObservableCollection<Drawable>();
-        readonly ObservableCollection<Callout> _callouts = new ObservableCollection<Callout>();
+        readonly ObservableRangeCollection<Pin> _pins = new ObservableRangeCollection<Pin>();
+        readonly ObservableRangeCollection<Drawable> _drawable = new ObservableRangeCollection<Drawable>();
+        readonly ObservableRangeCollection<Callout> _callouts = new ObservableRangeCollection<Callout>();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="T:Mapsui.UI.Forms.MapView"/> class.
@@ -50,9 +53,10 @@ namespace Mapsui.UI.Forms
             MyLocationFollow = false;
 
             IsClippedToBounds = true;
+            UseDoubleTap = false;
 
-            _mapControl = new MapControl { UseDoubleTap = false };
-            _mapMyLocationLayer = new MyLocationLayer(this) { Enabled = true };
+            MyLocationLayer = new MyLocationLayer(this) { Enabled = true };
+            _mapCalloutLayer = new MemoryLayer() { Name = CalloutLayerName, IsMapInfoLayer = true };
             _mapPinLayer = new MemoryLayer() { Name = PinLayerName, IsMapInfoLayer = true };
             _mapDrawableLayer = new MemoryLayer() { Name = DrawableLayerName, IsMapInfoLayer = true };
 
@@ -62,96 +66,41 @@ namespace Mapsui.UI.Forms
             PanLock = Map.PanLock;
 
             // Add some events to _mapControl
-            _mapControl.Viewport.ViewportChanged += HandlerViewportChanged;
-            _mapControl.ViewportInitialized += HandlerViewportInitialized;
-            _mapControl.Info += HandlerInfo;
-            _mapControl.PropertyChanged += HandlerMapControlPropertyChanged;
-            _mapControl.SingleTap += HandlerTap;
-            _mapControl.DoubleTap += HandlerTap;
-            _mapControl.LongTap += HandlerLongTap;
-            _mapControl.Hovered += HandlerHover;
-            _mapControl.TouchMove += (s, e) =>
+            Viewport.ViewportChanged += HandlerViewportChanged;
+            Info += HandlerInfo;
+            SingleTap += HandlerTap;
+            DoubleTap += HandlerTap;
+            LongTap += HandlerLongTap;
+            SizeChanged += HandlerSizeChanged;
+
+            TouchMove += (s, e) =>
             {
-                Device.BeginInvokeOnMainThread(() => MyLocationFollow = false);
+                RunOnUIThread(() => MyLocationFollow = false);
             };
 
             // Add MapView layers to Map
             AddLayers();
 
             // Add some events to _mapControl.Map.Layers
-            _mapControl.Map.Layers.LayerAdded += HandlerLayerChanged;
-            _mapControl.Map.Layers.LayerMoved += HandlerLayerChanged;
-            _mapControl.Map.Layers.LayerRemoved += HandlerLayerChanged;
+            Map.Layers.Changed += HandleLayersChanged;
 
-            AbsoluteLayout.SetLayoutBounds(_mapControl, new Rectangle(0, 0, 1, 1));
-            AbsoluteLayout.SetLayoutFlags(_mapControl, AbsoluteLayoutFlags.All);
+            _pictMyLocationNoCenter = new SKSvg().Load(Utilities.EmbeddedResourceLoader.Load("Images.LocationNoCenter.svg", typeof(MapView)));
+            _pictMyLocationCenter = new SKSvg().Load(Utilities.EmbeddedResourceLoader.Load("Images.LocationCenter.svg", typeof(MapView)));
 
-            _pictMyLocationNoCenter = new SkiaSharp.Extended.Svg.SKSvg().Load(Utilities.EmbeddedResourceLoader.Load("Images.LocationNoCenter.svg", typeof(MapView)));
-            _pictMyLocationCenter = new SkiaSharp.Extended.Svg.SKSvg().Load(Utilities.EmbeddedResourceLoader.Load("Images.LocationCenter.svg", typeof(MapView)));
-
-            _mapZoomInButton = new SvgButton(Utilities.EmbeddedResourceLoader.Load("Images.ZoomIn.svg", typeof(MapView)))
-            {
-                BackgroundColor = Color.White,
-                WidthRequest = 40,
-                HeightRequest = 40,
-                Command = new Command(obj => { _mapControl.Navigator.ZoomIn(); Refresh(); })
-            };
-
-            _mapZoomOutButton = new SvgButton(Utilities.EmbeddedResourceLoader.Load("Images.ZoomOut.svg", typeof(MapView)))
-            {
-                BackgroundColor = Color.White,
-                WidthRequest = 40,
-                HeightRequest = 40,
-                Command = new Command(obj => { _mapControl.Navigator.ZoomOut(); Refresh(); }),
-            };
-
-            _mapSpacingButton1 = new Image { BackgroundColor = Color.Transparent, WidthRequest = 40, HeightRequest = 8 };
-
-            _mapMyLocationButton = new SvgButton(_pictMyLocationNoCenter)
-            {
-                BackgroundColor = Color.White,
-                WidthRequest = 40,
-                HeightRequest = 40,
-                Command = new Command(obj => MyLocationFollow = !MyLocationFollow),
-            };
-
-            _mapSpacingButton2 = new Image { BackgroundColor = Color.Transparent, WidthRequest = 40, HeightRequest = 8 };
-
-            _mapNorthingButton = new SvgButton(Utilities.EmbeddedResourceLoader.Load("Images.RotationZero.svg", typeof(MapView)))
-            {
-                BackgroundColor = Color.White,
-                WidthRequest = 40,
-                HeightRequest = 40,
-                Command = new Command(obj => Device.BeginInvokeOnMainThread(() => _mapControl.Navigator.RotateTo(0))),
-            };
-
-            _mapButtons = new StackLayout { BackgroundColor = Color.Transparent, Opacity = 0.8, Spacing = 0, IsVisible = true };
-
-            _mapButtons.Children.Add(_mapZoomInButton);
-            _mapButtons.Children.Add(_mapZoomOutButton);
-            _mapButtons.Children.Add(_mapSpacingButton1);
-            _mapButtons.Children.Add(_mapMyLocationButton);
-            _mapButtons.Children.Add(_mapSpacingButton2);
-            _mapButtons.Children.Add(_mapNorthingButton);
-
-            AbsoluteLayout.SetLayoutBounds(_mapButtons, new Rectangle(0.95, 0.03, 40, 176));
-            AbsoluteLayout.SetLayoutFlags(_mapButtons, AbsoluteLayoutFlags.PositionProportional);
-
-            Content = new AbsoluteLayout
-            {
-                Children = {
-                    _mapControl,
-                    _mapButtons,
-                }
-            };
+            _pictZoomIn = new SKSvg().Load(Utilities.EmbeddedResourceLoader.Load("Images.ZoomIn.svg", typeof(MapView)));
+            _pictZoomOut = new SKSvg().Load(Utilities.EmbeddedResourceLoader.Load("Images.ZoomOut.svg", typeof(MapView)));
+            _pictNorthing = new SKSvg().Load(Utilities.EmbeddedResourceLoader.Load("Images.RotationZero.svg", typeof(MapView)));
 
             _pins.CollectionChanged += HandlerPinsOnCollectionChanged;
             _drawable.CollectionChanged += HandlerDrawablesOnCollectionChanged;
 
-            _mapPinLayer.DataSource = new ObservableCollectionProvider<Pin>(_pins);
+            _mapCalloutLayer.DataSource = new ObservableCollectionProvider<Callout, IGeometryFeature>(_callouts);
+            _mapCalloutLayer.Style = null;  // We don't want a global style for this layer
+
+            _mapPinLayer.DataSource = new ObservableCollectionProvider<Pin, IGeometryFeature>(_pins);
             _mapPinLayer.Style = null;  // We don't want a global style for this layer
 
-            _mapDrawableLayer.DataSource = new ObservableCollectionProvider<Drawable>(_drawable);
+            _mapDrawableLayer.DataSource = new ObservableCollectionProvider<Drawable, IGeometryFeature>(_drawable);
             _mapDrawableLayer.Style = null;  // We don't want a global style for this layer
         }
 
@@ -177,17 +126,12 @@ namespace Mapsui.UI.Forms
         /// </summary>
         public event EventHandler<MapLongClickedEventArgs> MapLongClicked;
 
-        /// <inheritdoc />
-        public event EventHandler ViewportInitialized;
-
-        /// <inheritdoc />
-        public event EventHandler<MapInfoEventArgs> Info;
-
         #endregion
 
         #region Bindings
 
         public static readonly BindableProperty SelectedPinProperty = BindableProperty.Create(nameof(SelectedPin), typeof(Pin), typeof(MapView), default(Pin), defaultBindingMode: BindingMode.TwoWay);
+        public static readonly BindableProperty UniqueCalloutProperty = BindableProperty.Create(nameof(UniqueCallout), typeof(bool), typeof(MapView), false, defaultBindingMode: BindingMode.TwoWay);
         public static readonly BindableProperty MyLocationEnabledProperty = BindableProperty.Create(nameof(MyLocationEnabled), typeof(bool), typeof(MapView), false, defaultBindingMode: BindingMode.TwoWay);
         public static readonly BindableProperty MyLocationFollowProperty = BindableProperty.Create(nameof(MyLocationFollow), typeof(bool), typeof(MapView), false, defaultBindingMode: BindingMode.TwoWay);
         public static readonly BindableProperty UnSnapRotationDegreesProperty = BindableProperty.Create(nameof(UnSnapRotationDegreesProperty), typeof(double), typeof(MapView), default(double));
@@ -198,41 +142,20 @@ namespace Mapsui.UI.Forms
         public static readonly BindableProperty IsZoomButtonVisibleProperty = BindableProperty.Create(nameof(IsZoomButtonVisibleProperty), typeof(bool), typeof(MapView), true);
         public static readonly BindableProperty IsMyLocationButtonVisibleProperty = BindableProperty.Create(nameof(IsMyLocationButtonVisibleProperty), typeof(bool), typeof(MapView), true);
         public static readonly BindableProperty IsNorthingButtonVisibleProperty = BindableProperty.Create(nameof(IsNorthingButtonVisibleProperty), typeof(bool), typeof(MapView), true);
+        public static readonly BindableProperty ButtonMarginProperty = BindableProperty.Create(nameof(ButtonMarginProperty), typeof(Thickness), typeof(MapView), new Thickness(20, 20));
+        public static readonly BindableProperty ButtonSpacingProperty = BindableProperty.Create(nameof(ButtonSpacingProperty), typeof(double), typeof(MapView), 8.0);
+        public static readonly BindableProperty ButtonSizeProperty = BindableProperty.Create(nameof(ButtonSizeProperty), typeof(double), typeof(MapView), 40.0);
         public static readonly BindableProperty UseDoubleTapProperty = BindableProperty.Create(nameof(UseDoubleTapProperty), typeof(bool), typeof(MapView), default(bool));
+        public static readonly BindableProperty UseFlingProperty = BindableProperty.Create(nameof(UseFlingProperty), typeof(bool), typeof(MapView), true);
 
         #endregion
 
         #region Properties
 
-        ///<summary>
-        /// Native Mapsui Map object
-        ///</summary>
-        public Map Map
-        {
-            get
-            {
-                return _mapControl.Map;
-            }
-            set
-            {
-                if (_mapControl.Map.Equals(value))
-                    return;
-
-                if (_mapControl.Map != null)
-                {
-                    _mapControl.Viewport.ViewportChanged -= HandlerViewportChanged;
-                    _mapControl.Info -= HandlerInfo;
-                    RemoveLayers();
-                }
-
-                _mapControl.Map = value;
-            }
-        }
-
         /// <summary>
         /// MyLocation layer
         /// </summary>
-        public MyLocationLayer MyLocationLayer => _mapMyLocationLayer;
+        public MyLocationLayer MyLocationLayer { get; }
 
         /// <summary>
         /// Should my location be visible on map
@@ -270,27 +193,18 @@ namespace Mapsui.UI.Forms
         }
 
         /// <summary>
+        /// Single or multiple callouts possible
+        /// </summary>
+        public bool UniqueCallout
+        {
+            get { return (bool)GetValue(UniqueCalloutProperty); }
+            set { SetValue(UniqueCalloutProperty, value); }
+        }
+
+        /// <summary>
         /// List of drawables like polyline and polygon
         /// </summary>
         public IList<Drawable> Drawables => _drawable;
-
-        /// <summary>
-        /// Number of degrees, before the rotation starts
-        /// </summary>
-        public double UnSnapRotationDegrees
-        {
-            get { return (double)GetValue(UnSnapRotationDegreesProperty); }
-            set { SetValue(UnSnapRotationDegreesProperty, value); }
-        }
-
-        /// <summary>
-        /// Number of degrees, when map shows to north
-        /// </summary>
-        public double ReSnapRotationDegrees
-        {
-            get { return (double)GetValue(ReSnapRotationDegreesProperty); }
-            set { SetValue(ReSnapRotationDegreesProperty, value); }
-        }
 
         /// <summary>
         /// Enable rotation with pinch gesture
@@ -347,171 +261,69 @@ namespace Mapsui.UI.Forms
         }
 
         /// <summary>
-        /// Enable checks for double tapping. 
-        /// But be carefull, this will add some extra time, before a single
-        /// tap is returned.
+        /// Margin for buttons
         /// </summary>
-        public bool UseDoubleTap
+        public Thickness ButtonMargin
         {
-            get => (bool)GetValue(UseDoubleTapProperty);
-            set => SetValue(UseDoubleTapProperty, value);
+            get => (Thickness)GetValue(ButtonMarginProperty);
+            set => SetValue(ButtonMarginProperty, value);
         }
 
         /// <summary>
-        /// Viewport of MapControl
+        /// Spacing between buttons
         /// </summary>
-        public IReadOnlyViewport Viewport => _mapControl.Viewport;
+        public double ButtonSpacing
+        {
+            get => (double)GetValue(ButtonSpacingProperty);
+            set => SetValue(ButtonSpacingProperty, value);
+        }
 
         /// <summary>
-        /// Navigator of MapControl
+        /// Size of buttons in x- and y-direction
         /// </summary>
-        public INavigator Navigator => _mapControl.Navigator;
-
-        /// <summary>
-        /// Underlying MapControl
-        /// </summary>
-        internal IMapControl MapControl => _mapControl;
-
-        /// <summary>
-        /// IMapControl
-        /// </summary>
-
-        /// <inheritdoc />
-        public float PixelDensity => _mapControl.PixelDensity;
-
-        /// <inheritdoc />
-        public IRenderer Renderer => _mapControl.Renderer;
-
-        #endregion
-
-        #region IMapControl implementation
-
-        /// <inheritdoc />
-        public void Refresh()
+        public double ButtonSize
         {
-            _mapControl.Refresh();
-        }
-
-        /// <inheritdoc />
-        public MapInfo GetMapInfo(Geometries.Point screenPosition, int margin = 0)
-        {
-            return MapInfoHelper.GetMapInfo(Map.Layers.Where(l => l.IsMapInfoLayer), Viewport,
-                screenPosition, _mapControl.Renderer.SymbolCache, margin);
-        }
-
-        /// <inheritdoc />
-        public void RefreshGraphics()
-        {
-            _mapControl.RefreshGraphics();
-        }
-
-        /// <inheritdoc />
-        public void RefreshData()
-        {
-            _mapControl.RefreshData();
-        }
-
-        /// <inheritdoc />
-        public void Unsubscribe()
-        {
-            _mapControl.Unsubscribe();
-        }
-
-        /// <inheritdoc />
-        public void OpenBrowser(string url)
-        {
-            _mapControl.OpenBrowser(url);
-        }
-
-        /// <inheritdoc />
-        public Geometries.Point ToDeviceIndependentUnits(Geometries.Point coordinateInPixels)
-        {
-            return _mapControl.ToDeviceIndependentUnits(coordinateInPixels);
-        }
-
-        /// <inheritdoc />
-        public Geometries.Point ToPixels(Geometries.Point coordinateInDeviceIndependentUnits)
-        {
-            return _mapControl.ToPixels(coordinateInDeviceIndependentUnits);
+            get => (double)GetValue(ButtonSizeProperty);
+            set => SetValue(ButtonSizeProperty, value);
         }
 
         #endregion
 
-        #region Callouts
-
-        private Callout _callout;
-
-        /// <summary>
-        /// Creates a callout at the given position
-        /// </summary>
-        /// <returns>The callout</returns>
-        /// <param name="position">Position of callout</param>
-        public Callout CreateCallout(Position position)
+        internal void AddCallout(Callout callout)
         {
-            _callout = new Callout(_mapControl)
+            if (!_callouts.Contains(callout))
             {
-                Anchor = position
-            };
+                if (UniqueCallout)
+                    HideCallouts();
 
-            // My interpretation (PDD): This while keeps looping until the asynchronous call
-            // above has created a callout.
-            // An alternative might be to avoid CreateCallout from a non-ui thread by throwing
-            // early.
-            while (_callout == null) ;
+                _callouts.Add(callout);
 
-            var result = _callout;
-            _callout = null;
+                Refresh();
+            }
+        }
 
-            return result;
+        internal void RemoveCallout(Callout callout)
+        {
+            if (_callouts.Contains(callout))
+            {
+                _callouts.Remove(callout);
+
+                Refresh();
+            }
+        }
+
+        internal bool IsCalloutVisible(Callout callout)
+        {
+            return _callouts.Contains(callout);
         }
 
         /// <summary>
-        /// Shows given callout
+        /// Hide all visible callouts
         /// </summary>
-        /// <param name="callout">Callout to show</param>
-        public void ShowCallout(Callout callout)
+        public void HideCallouts()
         {
-            if (callout == null)
-                return;
-
-            // Set absolute layout constrains
-            AbsoluteLayout.SetLayoutFlags(callout, AbsoluteLayoutFlags.None);
-
-            // Add it to MapView
-            if (!((AbsoluteLayout)Content).Children.Contains(callout))
-                Device.BeginInvokeOnMainThread(() => ((AbsoluteLayout)Content).Children.Add(callout));
-
-            // Add it to list of active Callouts
-            _callouts.Add(callout);
-
-            // When Callout is closed by close button
-            callout.CalloutClosed += (s, e) => HideCallout((Callout)s);
-
-            // Inform Callout
-            callout.Show();
+            _callouts.Clear();
         }
-
-        /// <summary>
-        /// Hides given callout
-        /// </summary>
-        /// <param name="callout">Callout to hide</param>
-        public void HideCallout(Callout callout)
-        {
-            if (callout == null)
-                return;
-
-            // Inform Callout
-            callout.Hide();
-
-            // Remove it from list of active Callouts
-            _callouts.Remove(callout);
-
-            // Remove it from MapView
-            if (((AbsoluteLayout)Content).Children.Contains(callout))
-                Device.BeginInvokeOnMainThread(() => ((AbsoluteLayout)Content).Children.Remove(callout));
-        }
-
-        #endregion
 
         IEnumerator IEnumerable.GetEnumerator()
         {
@@ -529,18 +341,16 @@ namespace Mapsui.UI.Forms
 
             if (propertyName.Equals(nameof(MyLocationEnabledProperty)) || propertyName.Equals(nameof(MyLocationEnabled)))
             {
-                _mapMyLocationLayer.Enabled = MyLocationEnabled;
+                MyLocationLayer.Enabled = MyLocationEnabled;
                 Refresh();
             }
 
             if (propertyName.Equals(nameof(MyLocationFollowProperty)) || propertyName.Equals(nameof(MyLocationFollow)))
             {
-                _mapMyLocationButton.IsEnabled = !MyLocationFollow;
-
                 if (MyLocationFollow)
                 {
                     _mapMyLocationButton.Picture = _pictMyLocationCenter;
-                    _mapControl.Navigator.CenterOn(_mapMyLocationLayer.MyLocation.ToMapsui());
+                    Navigator.CenterOn(MyLocationLayer.MyLocation.ToMapsui());
                 }
                 else
                 {
@@ -550,65 +360,80 @@ namespace Mapsui.UI.Forms
                 Refresh();
             }
 
-            if (propertyName.Equals(nameof(UnSnapRotationDegreesProperty)) || propertyName.Equals(nameof(UnSnapRotationDegrees)))
-                _mapControl.UnSnapRotationDegrees = UnSnapRotationDegrees;
-
-            if (propertyName.Equals(nameof(ReSnapRotationDegreesProperty)) || propertyName.Equals(nameof(ReSnapRotationDegrees)))
-                _mapControl.ReSnapRotationDegrees = ReSnapRotationDegrees;
-
             if (propertyName.Equals(nameof(RotationLockProperty)) || propertyName.Equals(nameof(RotationLock)))
-                _mapControl.Map.RotationLock = RotationLock;
+                Map.RotationLock = RotationLock;
 
             if (propertyName.Equals(nameof(ZoomLockProperty)) || propertyName.Equals(nameof(ZoomLock)))
-                _mapControl.Map.ZoomLock = ZoomLock;
+                Map.ZoomLock = ZoomLock;
 
             if (propertyName.Equals(nameof(PanLockProperty)) || propertyName.Equals(nameof(PanLock)))
-                _mapControl.Map.PanLock = PanLock;
+                Map.PanLock = PanLock;
 
             if (propertyName.Equals(nameof(IsZoomButtonVisibleProperty)) || propertyName.Equals(nameof(IsZoomButtonVisible)))
             {
-                _mapZoomInButton.IsVisible = IsZoomButtonVisible;
-                _mapZoomOutButton.IsVisible = IsZoomButtonVisible;
-                _mapSpacingButton1.IsVisible = IsZoomButtonVisible && IsMyLocationButtonVisible;
+                if (_mapZoomInButton != null && _mapZoomOutButton != null)
+                {
+                    _mapZoomInButton.Enabled = IsZoomButtonVisible;
+                    _mapZoomOutButton.Enabled = IsZoomButtonVisible;
+                    UpdateButtonPositions();
+                }
             }
 
             if (propertyName.Equals(nameof(IsMyLocationButtonVisibleProperty)) || propertyName.Equals(nameof(IsMyLocationButtonVisible)))
             {
-                _mapMyLocationButton.IsVisible = IsMyLocationButtonVisible;
-                _mapSpacingButton1.IsVisible = IsZoomButtonVisible && IsMyLocationButtonVisible;
+                if (_mapMyLocationButton != null)
+                {
+                    _mapMyLocationButton.Enabled = IsMyLocationButtonVisible;
+                    UpdateButtonPositions();
+                }
             }
 
             if (propertyName.Equals(nameof(IsNorthingButtonVisibleProperty)) || propertyName.Equals(nameof(IsNorthingButtonVisible)))
             {
-                _mapNorthingButton.IsVisible = IsNorthingButtonVisible;
-                _mapSpacingButton2.IsVisible = (IsMyLocationButtonVisible || IsZoomButtonVisible) && IsNorthingButtonVisible;
+                if (_mapNorthingButton != null)
+                {
+                    _mapNorthingButton.Enabled = IsNorthingButtonVisible;
+                    UpdateButtonPositions();
+                }
             }
 
-            if (propertyName.Equals(nameof(UseDoubleTapProperty)) || propertyName.Equals(nameof(UseDoubleTap)))
-                _mapControl.UseDoubleTap = UseDoubleTap;
-        }
-
-        #region Handlers
-
-        /// <summary>
-        /// MapControl has changed
-        /// </summary>
-        /// <param name="sender">MapControl of this event</param>
-        /// <param name="e">Event arguments containing what changed</param>
-        private void HandlerMapControlPropertyChanged(object sender, PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName.Equals(nameof(MapControl.Map)))
+            if (propertyName.Equals(nameof(ButtonMarginProperty)) || propertyName.Equals(nameof(ButtonMargin)))
             {
-                if (_mapControl.Map != null)
+                UpdateButtonPositions();
+            }
+
+            if (propertyName.Equals(nameof(ButtonSpacingProperty)) || propertyName.Equals(nameof(ButtonSpacing)))
+            {
+                UpdateButtonPositions();
+            }
+
+            if (propertyName.Equals(nameof(ButtonSizeProperty)) || propertyName.Equals(nameof(ButtonSize)))
+            {
+                UpdateButtonPositions();
+            }
+
+            if (propertyName.Equals(nameof(Map)))
+            {
+                if (Map != null)
                 {
                     // Remove MapView layers
                     RemoveLayers();
 
                     // Readd them, so that they always on top
                     AddLayers();
+
+                    // Remove widget buttons and readd them
+                    RemoveButtons();
+                    CreateButtons();
+
+                    // Add event handlers
+                    Viewport.ViewportChanged += HandlerViewportChanged;
+                    Info += HandlerInfo;
                 }
             }
         }
+
+        #region Handlers
 
         /// <summary>
         /// Viewport of map has changed
@@ -619,43 +444,28 @@ namespace Mapsui.UI.Forms
         {
             if (e.PropertyName.Equals(nameof(Viewport.Rotation)))
             {
-                _mapMyLocationLayer.UpdateMyDirection(_mapMyLocationLayer.Direction, _mapControl.Viewport.Rotation);
+                MyLocationLayer.UpdateMyDirection(MyLocationLayer.Direction, Viewport.Rotation);
 
-                // Check all callout positions
-                var list = _callouts.ToList();
-
-                // First check all Callouts, that belong to a pin
-                foreach (var pin in _pins)
-                {
-                    if (pin.Callout != null)
-                    {
-                        pin.UpdateCalloutPosition();
-                        list.Remove(pin.Callout);
-                    }
-                }
-
-                // Now check the rest, Callouts not belonging to a pin
-                foreach (var c in list)
-                    c.UpdateScreenPosition();
-
+                // Update rotationButton
+                _mapNorthingButton.Rotation = (float)Viewport.Rotation;
             }
+
             if (e.PropertyName.Equals(nameof(Viewport.Center)))
             {
-                if (MyLocationFollow && !_mapControl.Viewport.Center.Equals(_mapMyLocationLayer.MyLocation.ToMapsui()))
+                if (MyLocationFollow && !Viewport.Center.Equals(MyLocationLayer.MyLocation.ToMapsui()))
                 {
                     //_mapControl.Map.NavigateTo(_mapMyLocationLayer.MyLocation.ToMapsui());
                 }
             }
         }
 
-        private void HandlerViewportInitialized(object sender, EventArgs e)
+        private void HandleLayersChanged(object sender, LayerCollectionChangedEventArgs args)
         {
-            ViewportInitialized?.Invoke(sender, e);
-        }
+            var localRemovedLayers = args.RemovedLayers?.ToList() ?? new List<ILayer>();
+            var localAddedLayers = args.AddedLayers?.ToList() ?? new List<ILayer>();
 
-        private void HandlerLayerChanged(ILayer layer)
-        {
-            if (layer == _mapMyLocationLayer || layer == _mapDrawableLayer || layer == _mapPinLayer)
+            if (localRemovedLayers.Contains(MyLocationLayer) || localRemovedLayers.Contains(_mapDrawableLayer) || localRemovedLayers.Contains(_mapPinLayer) || localRemovedLayers.Contains(_mapCalloutLayer) || 
+                localAddedLayers.Contains(MyLocationLayer) || localAddedLayers.Contains(_mapDrawableLayer) || localAddedLayers.Contains(_mapPinLayer) || localAddedLayers.Contains(_mapCalloutLayer))
                 return;
 
             // Remove MapView layers
@@ -677,10 +487,9 @@ namespace Mapsui.UI.Forms
                     // Remove old pins from layer
                     if (item is Pin pin)
                     {
-                        HideCallout(pin.Callout);
-                        pin.Callout = null;
-
                         pin.PropertyChanged -= HandlerPinPropertyChanged;
+
+                        pin.HideCallout();
 
                         if (SelectedPin != null && SelectedPin.Equals(pin))
                             SelectedPin = null;
@@ -692,10 +501,12 @@ namespace Mapsui.UI.Forms
             {
                 foreach (var item in e.NewItems)
                 {
-                    // Add new pins to layer
-                    var pin = item as Pin;
-
-                    if (pin != null) pin.PropertyChanged += HandlerPinPropertyChanged;
+                    if (item is Pin pin)
+                    {
+                        // Add new pins to layer, so set MapView
+                        pin.MapView = this;
+                        pin.PropertyChanged += HandlerPinPropertyChanged;
+                    }
                 }
             }
 
@@ -715,75 +526,108 @@ namespace Mapsui.UI.Forms
                 }
             }
 
-            foreach (var item in e.NewItems)
+            if (e.NewItems != null)
             {
-                // Add new drawables to layer
-                if (item is INotifyPropertyChanged drawable)
-                    drawable.PropertyChanged += HandlerDrawablePropertyChanged;
+                foreach (var item in e.NewItems)
+                {
+                    // Add new drawables to layer
+                    if (item is INotifyPropertyChanged drawable)
+                        drawable.PropertyChanged += HandlerDrawablePropertyChanged;
+                }
             }
 
             Refresh();
         }
 
-        private void HandlerHover(object sender, HoveredEventArgs e)
-        {
-        }
-
         private void HandlerInfo(object sender, MapInfoEventArgs e)
         {
             // Click on pin?
-            Pin clickedPin = null;
-
-            foreach (var pin in _pins)
+            if (e.MapInfo.Layer == _mapPinLayer)
             {
-                if (pin.IsVisible && pin.Feature.Equals(e.MapInfo.Feature))
+                Pin clickedPin = null;
+                var pins = _pins.ToList();
+
+                foreach (var pin in pins)
                 {
-                    clickedPin = pin;
-                    break;
+                    if (pin.IsVisible && pin.Feature.Equals(e.MapInfo.Feature))
+                    {
+                        clickedPin = pin;
+                        break;
+                    }
+                }
+
+                if (clickedPin != null)
+                {
+                    SelectedPin = clickedPin;
+
+                    SelectedPinChanged?.Invoke(this, new SelectedPinChangedEventArgs(SelectedPin));
+
+                    var pinArgs = new PinClickedEventArgs(clickedPin, Viewport.ScreenToWorld(e.MapInfo.ScreenPosition).ToForms(), e.NumTaps);
+
+                    PinClicked?.Invoke(this, pinArgs);
+
+                    if (pinArgs.Handled)
+                    {
+                        e.Handled = true;
+                        return;
+                    }
                 }
             }
-
-            if (clickedPin != null)
+            // Check for clicked callouts
+            else if (e.MapInfo.Layer == _mapCalloutLayer)
             {
-                SelectedPin = clickedPin;
+                Callout clickedCallout = null;
+                var callouts = _callouts.ToList();
 
-                SelectedPinChanged?.Invoke(this, new SelectedPinChangedEventArgs(SelectedPin));
-
-                var pinArgs = new PinClickedEventArgs(clickedPin, _mapControl.Viewport.ScreenToWorld(e.MapInfo.ScreenPosition).ToForms(), e.NumTaps);
-
-                PinClicked?.Invoke(this, pinArgs);
-
-                if (pinArgs.Handled)
+                foreach (var callout in callouts)
                 {
-                    e.Handled = true;
-                    return;
+                    if (callout.Feature.Equals(e.MapInfo.Feature))
+                    {
+                        clickedCallout = callout;
+                        break;
+                    }
                 }
-            }
 
-            // Check for clicked drawables
-            var drawables = GetDrawablesAt(_mapControl.Viewport.ScreenToWorld(e.MapInfo.ScreenPosition), _mapDrawableLayer);
+                var calloutArgs = new CalloutClickedEventArgs(clickedCallout, 
+                    Viewport.ScreenToWorld(e.MapInfo.ScreenPosition).ToForms(),
+                    new Point(e.MapInfo.ScreenPosition.X, e.MapInfo.ScreenPosition.Y), e.NumTaps);
 
-            var drawableArgs = new DrawableClickedEventArgs(
-                _mapControl.Viewport.ScreenToWorld(e.MapInfo.ScreenPosition).ToForms(), 
-                new Point(e.MapInfo.ScreenPosition.X, e.MapInfo.ScreenPosition.Y), e.NumTaps);
+                clickedCallout?.HandleCalloutClicked(this, calloutArgs);
 
-            // Now check each drawable until one handles the event
-            foreach (var drawable in drawables)
-            {
-                drawable.HandleClicked(drawableArgs);
+                e.Handled = calloutArgs.Handled;
 
-                if (!drawableArgs.Handled) continue;
-                e.Handled = true;
                 return;
             }
+            // Check for clicked drawables
+            else if (e.MapInfo.Layer == _mapDrawableLayer)
+            {
+                Drawable clickedDrawable = null;
+                var drawables = _drawable.ToList();
 
-            // Call Info event, if there is one
-            Info?.Invoke(sender, e);
+                foreach (var drawable in drawables)
+                {
+                    if (drawable.IsClickable && drawable.Feature.Equals(e.MapInfo.Feature))
+                    {
+                        clickedDrawable = drawable;
+                        break;
+                    }
+                }
+
+                var drawableArgs = new DrawableClickedEventArgs(
+                    Viewport.ScreenToWorld(e.MapInfo.ScreenPosition).ToForms(),
+                    new Point(e.MapInfo.ScreenPosition.X, e.MapInfo.ScreenPosition.Y), e.NumTaps);
+
+                clickedDrawable?.HandleClicked(drawableArgs);
+
+                e.Handled = drawableArgs.Handled;
+                
+                return;
+            }
         }
 
         private void HandlerLongTap(object sender, TappedEventArgs e)
         {
-            var args = new MapLongClickedEventArgs(_mapControl.Viewport.ScreenToWorld(e.ScreenPosition).ToForms());
+            var args = new MapLongClickedEventArgs(Viewport.ScreenToWorld(e.ScreenPosition).ToForms());
 
             MapLongClicked?.Invoke(this, args);
 
@@ -796,36 +640,33 @@ namespace Mapsui.UI.Forms
         private void HandlerTap(object sender, TappedEventArgs e)
         {
             // Close all closable Callouts
-            var list = _callouts.ToList();
-
-            // First check all Callouts, that belong to a pin
-            foreach (var pin in _pins)
-            {
-                if (pin.Callout != null)
-                {
-                    if (pin.Callout.IsClosableByClick)
-                        pin.IsCalloutVisible = false;
-                    list.Remove(pin.Callout);
-                }
-            }
-
-            // Now check the rest, Callouts not belonging to a pin
-            foreach (var c in list)
-                if (c.IsClosableByClick)
-                    HideCallout(c);
+            var pins = _pins.ToList();
 
             e.Handled = false;
 
-            // Check, if we hit a widget or drawable
-            // Is there a widget at this position
-            // Is there a drawable at this position
             if (Map != null)
             {
-                var mapInfo = _mapControl.GetMapInfo(e.ScreenPosition);
+                // Check, if we hit a widget
+                // Is there a widget at this position
+                foreach (var widget in Map.Widgets)
+                {
+                    if (widget.Enabled && widget.Envelope.Contains(e.ScreenPosition))
+                    {
+                        if (widget.HandleWidgetTouched(Navigator, e.ScreenPosition))
+                        {
+                            e.Handled = true;
+                            return;
+                        }
+                    }
+                }
+
+                // Check, if we hit a drawable
+                // Is there a drawable at this position
+                var mapInfo = GetMapInfo(e.ScreenPosition);
 
                 if (mapInfo.Feature == null)
                 {
-                    var args = new MapClickedEventArgs(_mapControl.Viewport.ScreenToWorld(e.ScreenPosition).ToForms(), e.NumOfTaps);
+                    var args = new MapClickedEventArgs(Viewport.ScreenToWorld(e.ScreenPosition).ToForms(), e.NumOfTaps);
 
                     MapClicked?.Invoke(this, args);
 
@@ -842,18 +683,33 @@ namespace Mapsui.UI.Forms
                 }
 
                 // A feature is clicked
-                HandlerInfo(sender, new MapInfoEventArgs { MapInfo = mapInfo, Handled = e.Handled, NumTaps = e.NumOfTaps });
+                var mapInfoEventArgs = new MapInfoEventArgs { MapInfo = mapInfo, Handled = e.Handled, NumTaps = e.NumOfTaps };
+
+                HandlerInfo(sender, mapInfoEventArgs);
+
+                e.Handled = mapInfoEventArgs.Handled;
             }
         }
 
         private void HandlerPinPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            Map.RefreshData(_mapControl.Viewport.Extent, _mapControl.Viewport.Resolution, false);
+            Map.RefreshData(Viewport.Extent, Viewport.Resolution, ChangeType.Continuous);
+
+            // Repaint map, because something could have changed
+            RefreshGraphics();
         }
 
         private void HandlerDrawablePropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            Map.RefreshData(_mapControl.Viewport.Extent, _mapControl.Viewport.Resolution, false);
+            Map.RefreshData(Viewport.Extent, Viewport.Resolution, ChangeType.Continuous);
+
+            // Repaint map, because something could have changed
+            RefreshGraphics();
+        }
+
+        private void HandlerSizeChanged(object sender, EventArgs e)
+        {
+            UpdateButtonPositions();
         }
 
         #endregion
@@ -863,10 +719,11 @@ namespace Mapsui.UI.Forms
         /// </summary>
         private void AddLayers()
         {
+            if (!_initialized)
+                return;
+
             // Add MapView layers
-            _mapControl.Map.Layers.Add(_mapDrawableLayer);
-            _mapControl.Map.Layers.Add(_mapPinLayer);
-            _mapControl.Map.Layers.Add(_mapMyLocationLayer);
+            Map.Layers.Add(_mapDrawableLayer, _mapPinLayer, _mapCalloutLayer, MyLocationLayer);
         }
 
         /// <summary>
@@ -874,10 +731,11 @@ namespace Mapsui.UI.Forms
         /// </summary>
         private void RemoveLayers()
         {
+            if (!_initialized)
+                return;
+
             // Remove MapView layers
-            _mapControl.Map.Layers.Remove(_mapMyLocationLayer);
-            _mapControl.Map.Layers.Remove(_mapPinLayer);
-            _mapControl.Map.Layers.Remove(_mapDrawableLayer);
+            Map.Layers.Remove(MyLocationLayer, _mapCalloutLayer, _mapPinLayer, _mapDrawableLayer);
         }
 
         /// <summary>
@@ -891,28 +749,110 @@ namespace Mapsui.UI.Forms
             List<Drawable> drawables = new List<Drawable>();
 
             if (layer.Enabled == false) return drawables;
-            if (layer.MinVisible > _mapControl.Viewport.Resolution) return drawables;
-            if (layer.MaxVisible < _mapControl.Viewport.Resolution) return drawables;
+            if (layer.MinVisible > Viewport.Resolution) return drawables;
+            if (layer.MaxVisible < Viewport.Resolution) return drawables;
 
-            var allFeatures = layer.GetFeaturesInView(layer.Envelope, _mapControl.Viewport.Resolution);
-
-            // Now check all features, if they are clicked and clickable
-            foreach (var feature in allFeatures)
+            if (layer.GetFeaturesInView(layer.Envelope, Viewport.Resolution) is
+                IEnumerable<IGeometryFeature> allFeatures)
             {
-                if (feature.Geometry.Contains(point))
+                // Now check all features, if they are clicked and clickable
+                foreach (var feature in allFeatures)
                 {
-                    var drawable = _drawable.Where(f => f.Feature == feature).First();
-                    // Take only the clickable object
-                    if (drawable.IsClickable)
-                        drawables.Add(drawable);
+                    if (feature.Geometry.Contains(point))
+                    {
+                        var drawable = _drawable.Where(f => f.Feature == feature).First();
+                        // Take only the clickable object
+                        if (drawable.IsClickable)
+                            drawables.Add(drawable);
+                    }
                 }
             }
 
             // If there more than one drawables found, than reverse, because the top most should be the first
             if (drawables.Count > 1)
-                drawables.Reverse();
+                    drawables.Reverse();
 
             return drawables;
+        }
+
+        private void UpdateButtonPositions()
+        {
+            var newX = Width - ButtonMargin.Right - ButtonSize;
+            var newY = ButtonMargin.Top;
+
+            if (IsZoomButtonVisible && _mapZoomInButton != null && _mapZoomOutButton != null)
+            {
+                _mapZoomInButton.Envelope = new Geometries.BoundingBox(newX, newY, newX + ButtonSize, newY + ButtonSize);
+                newY += ButtonSize;
+                _mapZoomOutButton.Envelope = new Geometries.BoundingBox(newX, newY, newX + ButtonSize, newY + ButtonSize);
+                newY += ButtonSize + ButtonSpacing;
+            }
+
+            if (IsMyLocationButtonVisible && _mapMyLocationButton != null)
+            {
+                _mapMyLocationButton.Envelope = new Geometries.BoundingBox(newX, newY, newX + ButtonSize, newY + ButtonSize);
+                newY += ButtonSize + ButtonSpacing;
+            }
+
+            if (IsNorthingButtonVisible && _mapNorthingButton != null)
+            {
+                _mapNorthingButton.Envelope = new Geometries.BoundingBox(newX, newY, newX + ButtonSize, newY + ButtonSize);
+            }
+
+            RefreshGraphics();
+        }
+
+        private void RemoveButtons()
+        {
+            var widgets = Map.Widgets.ToList();
+            widgets.Remove(_mapZoomInButton);
+            widgets.Remove(_mapZoomOutButton); 
+            widgets.Remove(_mapMyLocationButton);
+            widgets.Remove(_mapNorthingButton);
+            Map.Widgets.Clear();
+            Map.Widgets.AddRange(widgets);
+
+            RefreshGraphics();
+        }
+
+        private void CreateButtons()
+        {
+            _mapZoomInButton = _mapZoomInButton ?? CreateButton(0, 0, _pictZoomIn, (s, e) => { Navigator.ZoomIn(); e.Handled = true; });
+            _mapZoomInButton.Picture = _pictZoomIn;
+            _mapZoomInButton.Enabled = IsZoomButtonVisible;
+            Map.Widgets.Add(_mapZoomInButton);
+
+            _mapZoomOutButton = _mapZoomOutButton ?? CreateButton(0, 40, _pictZoomOut, (s, e) => { Navigator.ZoomOut(); e.Handled = true; });
+            _mapZoomOutButton.Picture = _pictZoomOut;
+            _mapZoomOutButton.Enabled = IsZoomButtonVisible;
+            Map.Widgets.Add(_mapZoomOutButton);
+
+            _mapMyLocationButton = _mapMyLocationButton ?? CreateButton(0, 88, _pictMyLocationNoCenter, (s, e) => { MyLocationFollow = true; e.Handled = true; });
+            _mapMyLocationButton.Picture = _pictMyLocationNoCenter;
+            _mapMyLocationButton.Enabled = IsMyLocationButtonVisible;
+            Map.Widgets.Add(_mapMyLocationButton);
+
+            _mapNorthingButton = _mapNorthingButton ?? CreateButton(0, 136, _pictNorthing, (s, e) => { RunOnUIThread(() => Navigator.RotateTo(0)); e.Handled = true; });
+            _mapNorthingButton.Picture = _pictNorthing;
+            _mapNorthingButton.Enabled = IsNorthingButtonVisible;
+            Map.Widgets.Add(_mapNorthingButton);
+
+            UpdateButtonPositions();
+        }
+
+        private ButtonWidget CreateButton(float x, float y, SKPicture picture, Action<object, WidgetTouchedEventArgs> action)
+        {
+            var result = new ButtonWidget
+            {
+                Picture = picture,
+                Envelope = new Geometries.BoundingBox(x, y, x + ButtonSize, y + ButtonSize),
+                Rotation = 0,
+                Enabled = true,
+            };
+            result.WidgetTouched += (s, e) => action(s, e);
+            result.PropertyChanged += (s, e) => RefreshGraphics();
+
+            return result;
         }
     }
 }

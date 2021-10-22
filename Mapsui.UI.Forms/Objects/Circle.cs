@@ -9,7 +9,7 @@ using System;
 
 namespace Mapsui.UI.Forms
 {
-    public sealed class Circle : Drawable
+    public class Circle : Drawable
     {
         public static readonly BindableProperty CenterProperty = BindableProperty.Create(nameof(Center), typeof(Position), typeof(Circle), default(Position));
         public static readonly BindableProperty RadiusProperty = BindableProperty.Create(nameof(Radius), typeof(Distance), typeof(Circle), Distance.FromMeters(1));
@@ -73,7 +73,13 @@ namespace Mapsui.UI.Forms
                     UpdateFeature();
                     break;
                 case nameof(FillColor):
-                    ((VectorStyle)Feature.Styles.First()).Fill = new Brush(FillColor.ToMapsui());
+                    ((VectorStyle)Feature.Styles.First()).Fill = new Styles.Brush(FillColor.ToMapsui());
+                    break;
+                case nameof(StrokeWidth):
+                    ((VectorStyle)Feature.Styles.First()).Outline.Width = StrokeWidth;
+                    break;
+                case nameof(StrokeColor):
+                    ((VectorStyle)Feature.Styles.First()).Outline.Color = StrokeColor.ToMapsui();
                     break;
             }
         }
@@ -95,8 +101,8 @@ namespace Mapsui.UI.Forms
                     Feature.Styles.Clear();
                     Feature.Styles.Add(new VectorStyle
                     {
-                        Line = new Pen { Width = StrokeWidth, Color = StrokeColor.ToMapsui() },
-                        Fill = new Brush { Color = FillColor.ToMapsui() }
+                        Outline = new Pen { Width = StrokeWidth, Color = StrokeColor.ToMapsui() },
+                        Fill = new Styles.Brush { Color = FillColor.ToMapsui() }
                     });
                 }
             }

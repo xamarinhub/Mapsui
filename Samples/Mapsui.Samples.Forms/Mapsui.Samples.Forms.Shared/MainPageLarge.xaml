@@ -13,11 +13,15 @@
                     WidthRequest="200"
                     Margin="10"
                     ItemSelected="OnSelection"/>
+                <Label x:Name="featureInfo"></Label>
             </StackLayout>
             <mapsui:MapView x:Name="mapView"
     		    VerticalOptions="FillAndExpand"
                 HorizontalOptions="FillAndExpand"
-		        BackgroundColor="Gray" 
+                IsZoomButtonVisible="True"		        
+                IsMyLocationButtonVisible="True"
+                IsNorthingButtonVisible="True"
+                BackgroundColor="Gray" 
 		        Margin="0" />
         </StackLayout>
     </ContentPage.Content>

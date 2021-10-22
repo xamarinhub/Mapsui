@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Mapsui.Geometries;
 using Mapsui.Logging;
 using Mapsui.Providers;
+using Mapsui.Rendering.Skia.Extensions;
 using Mapsui.Styles;
 using SkiaSharp;
 
@@ -10,7 +11,7 @@ namespace Mapsui.Rendering.Skia
 {
     public static class RasterRenderer
     {
-		public static void Draw (SKCanvas canvas, IReadOnlyViewport viewport, IStyle style, IFeature feature,
+		public static void Draw (SKCanvas canvas, IReadOnlyViewport viewport, IStyle style, IGeometryFeature feature,
             float opacity, IDictionary<object, BitmapInfo> tileCache, long currentIteration)
 		{
 		    try
@@ -44,14 +45,14 @@ namespace Mapsui.Rendering.Skia
 
 		            var destination = new BoundingBox(0.0, 0.0, boundingBox.Width, boundingBox.Height);
 
-		            BitmapHelper.RenderRaster(canvas, bitmapInfo.Bitmap, destination.ToSkia(), opacity);
+                    BitmapRenderer.Draw(canvas, bitmapInfo.Bitmap, destination.ToSkia(), opacity);
 
 		            canvas.SetMatrix(priorMatrix);
 		        }
 		        else
 		        {
 		            var destination = WorldToScreen(viewport, feature.Geometry.BoundingBox);
-		            BitmapHelper.RenderRaster(canvas, bitmapInfo.Bitmap, RoundToPixel(destination).ToSkia(), opacity);
+		            BitmapRenderer.Draw(canvas, bitmapInfo.Bitmap, RoundToPixel(destination).ToSkia(), opacity);
                 }
 		    }
 			catch (Exception ex)
@@ -62,27 +63,25 @@ namespace Mapsui.Rendering.Skia
 
         private static SKMatrix CreateRotationMatrix(IReadOnlyViewport viewport, BoundingBox boundingBox, SKMatrix priorMatrix)
         {
-            SKMatrix matrix = SKMatrix.MakeIdentity();
-
             // The front-end sets up the canvas with a matrix based on screen scaling (e.g. retina).
             // We need to retain that effect by combining our matrix with the incoming matrix.
 
             // We'll create four matrices in addition to the incoming matrix. They perform the
             // zoom scale, focal point offset, user rotation and finally, centering in the screen.
 
-            var userRotation = SKMatrix.MakeRotationDegrees((float) viewport.Rotation);
-            var focalPointOffset = SKMatrix.MakeTranslation(
+            var userRotation = SKMatrix.CreateRotationDegrees((float) viewport.Rotation);
+            var focalPointOffset = SKMatrix.CreateTranslation(
                 (float) (boundingBox.Left - viewport.Center.X),
                 (float) (viewport.Center.Y - boundingBox.Top));
-            var zoomScale = SKMatrix.MakeScale((float) (1.0 / viewport.Resolution), (float) (1.0 / viewport.Resolution));
-            var centerInScreen = SKMatrix.MakeTranslation((float) (viewport.Width / 2.0), (float) (viewport.Height / 2.0));
+            var zoomScale = SKMatrix.CreateScale((float) (1.0 / viewport.Resolution), (float) (1.0 / viewport.Resolution));
+            var centerInScreen = SKMatrix.CreateTranslation((float) (viewport.Width / 2.0), (float) (viewport.Height / 2.0));
 
             // We'll concatenate them like so: incomingMatrix * centerInScreen * userRotation * zoomScale * focalPointOffset
 
-            SKMatrix.Concat(ref matrix, zoomScale, focalPointOffset);
-            SKMatrix.Concat(ref matrix, userRotation, matrix);
-            SKMatrix.Concat(ref matrix, centerInScreen, matrix);
-            SKMatrix.Concat(ref matrix, priorMatrix, matrix);
+            SKMatrix matrix = SKMatrix.Concat(zoomScale, focalPointOffset);
+            matrix = SKMatrix.Concat(userRotation, matrix);
+            matrix = SKMatrix.Concat(centerInScreen, matrix);
+            matrix = SKMatrix.Concat(priorMatrix, matrix);
 
             return matrix;
         }

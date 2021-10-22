@@ -1,12 +1,10 @@
 ﻿using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("Mapsui.Tests")]
 namespace Mapsui.Fetcher
 {
     class FetchMachine
     {
-        private readonly List<FetchWorker> _worker = new List<FetchWorker>();
+        private readonly List<FetchWorker> _worker = new();
         
         public FetchMachine(IFetchDispatcher fetchDispatcher, int numberOfWorkers = 4)
         {

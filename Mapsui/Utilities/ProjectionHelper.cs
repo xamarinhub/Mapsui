@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Mapsui.Extensions;
 using Mapsui.Geometries;
 using Mapsui.Projection;
 using Mapsui.Providers;
@@ -74,7 +75,7 @@ namespace Mapsui.Utilities
 
         private static bool IsTransformationNeeded(string fromCRS, string toCRS)
         {
-           return !fromCRS.Equals(toCRS);
+           return !fromCRS?.Equals(toCRS) == true;
         }
 
         private static bool IsTransformationSupported(ITransformation transformation, string fromCRS, string toCRS)
@@ -96,7 +97,7 @@ namespace Mapsui.Utilities
         {
             if (!NeedsTransform(transformation, fromCRS, toCRS)) return features;
 
-            var copiedFeatures = features.Copy().ToList();
+            var copiedFeatures = features.Cast<IGeometryFeature>().Copy().ToList();
             foreach (var feature in copiedFeatures)
             {
                 if (feature.Geometry is Raster) continue;

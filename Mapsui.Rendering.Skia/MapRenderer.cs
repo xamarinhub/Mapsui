@@ -6,9 +6,13 @@ using Mapsui.Geometries;
 using Mapsui.Layers;
 using Mapsui.Logging;
 using Mapsui.Providers;
+using Mapsui.Rendering.Skia.Extensions;
+using Mapsui.Rendering.Skia.SkiaStyles;
 using Mapsui.Rendering.Skia.SkiaWidgets;
 using Mapsui.Styles;
+using Mapsui.UI;
 using Mapsui.Widgets;
+using Mapsui.Widgets.ButtonWidget;
 using Mapsui.Widgets.ScaleBar;
 using Mapsui.Widgets.Zoom;
 using SkiaSharp;
@@ -20,15 +24,18 @@ namespace Mapsui.Rendering.Skia
         private const int TilesToKeepMultiplier = 3;
         private const int MinimumTilesToKeep = 32;
         private readonly SymbolCache _symbolCache = new SymbolCache();
-
         private readonly IDictionary<object, BitmapInfo> _tileCache =
             new Dictionary<object, BitmapInfo>(new IdentityComparer<object>());
-
         private long _currentIteration;
 
         public ISymbolCache SymbolCache => _symbolCache;
 
         public IDictionary<Type, IWidgetRenderer> WidgetRenders { get; } = new Dictionary<Type, IWidgetRenderer>();
+
+        /// <summary>
+        /// Dictionary holding all special renderers for styles
+        /// </summary>
+        public IDictionary<Type, IStyleRenderer> StyleRenderers { get; } = new Dictionary<Type, IStyleRenderer>();
 
         static MapRenderer()
         {
@@ -40,12 +47,16 @@ namespace Mapsui.Rendering.Skia
             WidgetRenders[typeof(Hyperlink)] = new HyperlinkWidgetRenderer();
             WidgetRenders[typeof(ScaleBarWidget)] = new ScaleBarWidgetRenderer();
             WidgetRenders[typeof(ZoomInOutWidget)] = new ZoomInOutWidgetRenderer();
+            WidgetRenders[typeof(ButtonWidget)] = new ButtonWidgetRenderer();
         }
 
         public void Render(object target, IReadOnlyViewport viewport, IEnumerable<ILayer> layers,
             IEnumerable<IWidget> widgets, Color background = null)
         {
-            var allWidgets = layers.Select(l => l.Attribution).Where(w => w != null).ToList().Concat(widgets);
+            var attributions = layers.Where(l => l.Enabled).Select(l => l.Attribution).Where(w => w != null).ToList();
+
+            var allWidgets = widgets.Concat(attributions);
+
             RenderTypeSave((SKCanvas)target, viewport, layers, allWidgets, background);
         }
 
@@ -59,16 +70,21 @@ namespace Mapsui.Rendering.Skia
             Render(canvas, viewport, widgets, 1);
         }
 
-        public MemoryStream RenderToBitmapStream(IReadOnlyViewport viewport, IEnumerable<ILayer> layers, Color background = null)
+        public MemoryStream RenderToBitmapStream(IReadOnlyViewport viewport, IEnumerable<ILayer> layers, Color background = null, float pixelDensity = 1)
         {
             try
             {
-                using (var surface = SKSurface.Create(
-                    (int)viewport.Width, (int)viewport.Height, SKImageInfo.PlatformColorType, SKAlphaType.Unpremul))
+                var width = (int)viewport.Width;
+                var height = (int)viewport.Height;
+                var imageInfo = new SKImageInfo((int)Math.Round(width * pixelDensity), (int)Math.Round(height * pixelDensity), 
+                    SKImageInfo.PlatformColorType, SKAlphaType.Unpremul);
+
+                using (var surface = SKSurface.Create(imageInfo))
                 {
                     if (surface == null) return null;
                     // Not sure if this is needed here:
                     if (background != null) surface.Canvas.Clear(background.ToSkia(1));
+                    surface.Canvas.Scale(pixelDensity, pixelDensity);
                     Render(surface.Canvas, viewport, layers);
                     using (var image = surface.Snapshot())
                     {
@@ -94,7 +110,7 @@ namespace Mapsui.Rendering.Skia
             {
                 layers = layers.ToList();
 
-                VisibleFeatureIterator.IterateLayers(viewport, layers, (v, l, s, o) => { RenderFeature(canvas, v, l, s, o); });
+                VisibleFeatureIterator.IterateLayers(viewport, layers, (v, l, s, f, o) => { RenderFeature(canvas, v, l, s, f, o); });
 
                 RemovedUnusedBitmapsFromCache();
 
@@ -131,40 +147,150 @@ namespace Mapsui.Rendering.Skia
             }
         }
 
-        private void RenderFeature(SKCanvas canvas, IReadOnlyViewport viewport, IStyle style, IFeature feature, float layerOpacity)
+        private void RenderFeature(SKCanvas canvas, IReadOnlyViewport viewport, ILayer layer, IStyle style, IFeature feature, float layerOpacity)
         {
-            if (feature.Geometry is Point)
-                PointRenderer.Draw(canvas, viewport, style, feature, feature.Geometry, _symbolCache, layerOpacity * style.Opacity);
-            else if (feature.Geometry is MultiPoint)
-                MultiPointRenderer.Draw(canvas, viewport, style, feature, feature.Geometry, _symbolCache, layerOpacity * style.Opacity);
-            else if (feature.Geometry is LineString)
-                LineStringRenderer.Draw(canvas, viewport, style, feature, feature.Geometry, layerOpacity * style.Opacity);
-            else if (feature.Geometry is MultiLineString)
-                MultiLineStringRenderer.Draw(canvas, viewport, style, feature, feature.Geometry, layerOpacity * style.Opacity);
-            else if (feature.Geometry is Polygon)
-                PolygonRenderer.Draw(canvas, viewport, style, feature, feature.Geometry, layerOpacity * style.Opacity, _symbolCache);
-            else if (feature.Geometry is MultiPolygon)
-                MultiPolygonRenderer.Draw(canvas, viewport, style, feature, feature.Geometry, layerOpacity * style.Opacity, _symbolCache);
-            else if (feature.Geometry is IRaster)
-                RasterRenderer.Draw(canvas, viewport, style, feature, layerOpacity * style.Opacity, _tileCache, _currentIteration);
+            if (feature is IGeometryFeature geometryFeature)
+            {
+                // Check, if we have a special renderer for this style
+                if (StyleRenderers.ContainsKey(style.GetType()))
+                {
+                    // Save canvas
+                    canvas.Save();
+                    // We have a special renderer, so try, if it could draw this
+                    var result = ((ISkiaStyleRenderer) StyleRenderers[style.GetType()]).Draw(canvas, viewport, layer,
+                        geometryFeature, style, _symbolCache);
+                    // Restore old canvas
+                    canvas.Restore();
+                    // Was it drawn?
+                    if (result)
+                        // Yes, special style renderer drawn correct
+                        return;
+                }
+
+                // No special style renderer handled this up to now, than try standard renderers
+                if (geometryFeature.Geometry is Point)
+                    PointRenderer.Draw(canvas, viewport, style, geometryFeature, geometryFeature.Geometry, _symbolCache,
+                        layerOpacity * style.Opacity);
+                else if (geometryFeature.Geometry is MultiPoint)
+                    MultiPointRenderer.Draw(canvas, viewport, style, geometryFeature, geometryFeature.Geometry,
+                        _symbolCache, layerOpacity * style.Opacity);
+                else if (geometryFeature.Geometry is LineString)
+                    LineStringRenderer.Draw(canvas, viewport, style, geometryFeature, geometryFeature.Geometry,
+                        layerOpacity * style.Opacity);
+                else if (geometryFeature.Geometry is MultiLineString)
+                    MultiLineStringRenderer.Draw(canvas, viewport, style, geometryFeature, geometryFeature.Geometry,
+                        layerOpacity * style.Opacity);
+                else if (geometryFeature.Geometry is Polygon)
+                    PolygonRenderer.Draw(canvas, viewport, style, geometryFeature, geometryFeature.Geometry,
+                        layerOpacity * style.Opacity, _symbolCache);
+                else if (geometryFeature.Geometry is MultiPolygon)
+                    MultiPolygonRenderer.Draw(canvas, viewport, style, geometryFeature, geometryFeature.Geometry,
+                        layerOpacity * style.Opacity, _symbolCache);
+                else if (geometryFeature.Geometry is IRaster)
+                    RasterRenderer.Draw(canvas, viewport, style, geometryFeature, layerOpacity * style.Opacity,
+                        _tileCache, _currentIteration);
+            }
         }
 
         private void Render(object canvas, IReadOnlyViewport viewport, IEnumerable<IWidget> widgets, float layerOpacity)
         {
             WidgetRenderer.Render(canvas, viewport, widgets, WidgetRenders, layerOpacity);
         }
-    }
 
-    public class IdentityComparer<T> : IEqualityComparer<T> where T : class
-    {
-        public bool Equals(T obj, T otherObj)
+        public MapInfo GetMapInfo(double x, double y, IReadOnlyViewport viewport, IEnumerable<ILayer> layers, int margin = 0)
         {
-            return obj == otherObj;
+            // todo: use margin to increase the pixel area
+            // todo: We will need to select on style instead of layer
+            
+
+
+            layers = layers
+                .Select(l => (l is RasterizingLayer rl) ? rl.ChildLayer : l)
+                .Where(l => l.IsMapInfoLayer);
+
+            var list = new List<MapInfoRecord>();
+            var result = new MapInfo()
+            {
+                ScreenPosition = new Point(x, y),
+                WorldPosition = viewport.ScreenToWorld(x, y),
+                Resolution = viewport.Resolution
+            };
+
+            if (!viewport.Extent.Contains(viewport.ScreenToWorld(result.ScreenPosition))) return result;
+
+            try
+            {
+                var width = (int)viewport.Width;
+                var height = (int)viewport.Height;
+
+                var imageInfo = new SKImageInfo(width, height, SKImageInfo.PlatformColorType, SKAlphaType.Unpremul);
+
+                var intX = (int)x;
+                var intY = (int)y;
+
+                if (intX >= width || intY >= height)
+                    return result;
+
+                using (var surface = SKSurface.Create(imageInfo))
+                {
+                    if (surface == null) return null;
+
+                    surface.Canvas.ClipRect(new SKRect((float)(x - 1), (float)(y - 1), (float)(x + 1), (float)(y + 1)));
+                    surface.Canvas.Clear(SKColors.Transparent);
+
+                    var pixmap = surface.PeekPixels();
+                    var color = pixmap.GetPixelColor(intX, intY);
+
+                    VisibleFeatureIterator.IterateLayers(viewport, layers, (v, layer, style, feature, opacity) => {
+                        surface.Canvas.Save();
+                        // 1) Clear the entire bitmap
+                        surface.Canvas.Clear(SKColors.Transparent);
+                        // 2) Render the feature to the clean canvas
+                        RenderFeature(surface.Canvas, v, layer, style, feature, opacity);
+                        // 3) Check if the pixel has changed.
+                        if (color != pixmap.GetPixelColor(intX, intY))
+                            // 4) Add feature and style to result
+                            list.Add(new MapInfoRecord(feature, style, layer));
+                        surface.Canvas.Restore();
+                    });
+                }
+
+                if (list.Count == 0)
+                    return result;
+
+                list.Reverse();
+                var itemDrawnOnTop = list.First();
+
+                result.Feature = itemDrawnOnTop.Feature;
+                result.Style = itemDrawnOnTop.Style;
+                result.Layer = itemDrawnOnTop.Layer;
+                result.MapInfoRecords = list;
+
+            }
+            catch (Exception exception)
+            {
+                Logger.Log(LogLevel.Error, "Unexpected error in skia renderer", exception);
+            }
+
+            return result;
         }
 
-        public int GetHashCode(T obj)
+        public MapInfo GetMapInfo(Point screenPosition, IReadOnlyViewport viewport, IEnumerable<ILayer> layers, int margin = 0)
         {
-            return obj.GetHashCode();
+            return GetMapInfo(screenPosition.X, screenPosition.Y, viewport, layers, margin);
+        }
+
+        public class IdentityComparer<T> : IEqualityComparer<T> where T : class
+        {
+            public bool Equals(T obj, T otherObj)
+            {
+                return obj == otherObj;
+            }
+
+            public int GetHashCode(T obj)
+            {
+                return obj.GetHashCode();
+            }
         }
     }
 }

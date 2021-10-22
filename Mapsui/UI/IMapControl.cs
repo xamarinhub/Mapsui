@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using Mapsui.Geometries;
+using Mapsui.Layers;
 using Mapsui.Rendering;
+using Mapsui.Utilities;
 
 namespace Mapsui.UI
 {
@@ -14,9 +17,9 @@ namespace Mapsui.UI
 
         void RefreshGraphics();
 
-        void RefreshData();
+        void RefreshData(ChangeType changeType = ChangeType.Discrete);
 
-        void Refresh();
+        void Refresh(ChangeType changeType = ChangeType.Discrete);
 
         double UnSnapRotationDegrees { get; set; }
 
@@ -24,14 +27,14 @@ namespace Mapsui.UI
 
         void Unsubscribe();
 
+        IRenderer Renderer { get; }
+
+        void OpenBrowser(string url); //todo: Perhaps remove
+
         /// <summary>
         /// The number of pixel per device independent unit
         /// </summary>
         float PixelDensity { get; }
-
-        IRenderer Renderer { get; }
-
-        void OpenBrowser(string url); //todo: Perhaps remove
 
         /// <summary>
         /// Converts coordinates in pixels to device independent units (or DIP or DP).
@@ -54,7 +57,15 @@ namespace Mapsui.UI
         /// <param name="margin">An optional extra margin around the feature to enlarge the hit area.</param>
         MapInfo GetMapInfo(Point screenPosition, int margin = 0);
 
+        /// <summary>
+        /// Create a snapshot form map as PNG image
+        /// </summary>
+        /// <param name="layers">Layers that should be included in snapshot</param>
+        /// <returns>Byte array with snapshot in png format. If there are any problems than returns null.</returns>
+        byte[] GetSnapshot(IEnumerable<ILayer> layers = null);
+
         INavigator Navigator { get; }
 
+        Performance Performance { get; set; }
     }
 }

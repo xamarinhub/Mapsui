@@ -17,14 +17,14 @@ namespace Mapsui.Widgets.ScaleBar
     ///   map.Widgets.Add(new ScaleBarWidget(map));
     ///   
     /// Customize
-    /// ScaleBarMode: Determins, how much scalebars are shown. Could be Single or Both.
+    /// ScaleBarMode: Determines, how much scalebars are shown. Could be Single or Both.
     /// SecondaryUnitConverter: First UnitConverter for upper scalebar. There are UnitConverters for metric, imperial and nautical units.
     /// SecondaryUnitConverter = NauticalUnitConverter.Instance });
     /// MaxWidth: Maximal width of the scalebar. Real width could be smaller.
     /// HorizontalAlignment: Where the ScaleBarWidget is shown. Could be Left, Right, Center or Position.
     /// VerticalAlignment: Where the ScaleBarWidget is shown. Could be Top, Bottom, Center or Position.
-    /// PositionX: If HorizontalAlignment is Position, this value determins the distance to the left
-    /// PositionY: If VerticalAlignment is Position, this value determins the distance to the top
+    /// PositionX: If HorizontalAlignment is Position, this value determines the distance to the left
+    /// PositionY: If VerticalAlignment is Position, this value determines the distance to the top
     /// TextColor: Color for text and lines
     /// Halo: Color used around text and lines, so the scalebar is better visible
     /// TextAlignment: Alignment of scalebar text to the lines. Could be Left, Right or Center
@@ -43,7 +43,7 @@ namespace Mapsui.Widgets.ScaleBar
         private static readonly VerticalAlignment DefaultScaleBarVerticalAlignment = VerticalAlignment.Bottom;
         private static readonly Alignment DefaultScaleBarAlignment = Alignment.Left;
         private static readonly ScaleBarMode DefaultScaleBarMode = ScaleBarMode.Single;
-        private static readonly Font DefaultFont = new Font { FontFamily = "Arial", Size = 10 };
+        private static readonly Font DefaultFont = new() { FontFamily = "Arial", Size = 10 };
 
         public ScaleBarWidget(Map map)
         {
@@ -102,7 +102,7 @@ namespace Mapsui.Widgets.ScaleBar
             }
         }
 
-        Color _textColor = new Color(0, 0, 0);
+        Color _textColor = new(0, 0, 0);
 
         /// <summary>
         /// Foreground color of scalebar and text
@@ -119,7 +119,7 @@ namespace Mapsui.Widgets.ScaleBar
             }
         }
 
-        Color _haloColor = new Color(255, 255, 255);
+        Color _haloColor = new(255, 255, 255);
 
         /// <summary>
         /// Halo color of scalebar and text, so that it is better visible
@@ -294,7 +294,7 @@ namespace Mapsui.Widgets.ScaleBar
         }
 
         /// <summary>
-        /// Get pairs of points, which determin start and stop of the lines used to draw the scalebar
+        /// Get pairs of points, which determine start and stop of the lines used to draw the scalebar
         /// </summary>
         /// <param name="viewport">The viewport of the map</param>
         /// <param name="scaleBarLength1">Length of upper scalebar</param>
@@ -404,7 +404,7 @@ namespace Mapsui.Widgets.ScaleBar
         /// Calculates the top-left-position of upper and lower text
         /// </summary>
         /// <param name="viewport">The viewport</param>
-        /// <param name="textSize">Default textsize for the string "9999 m"</param>
+        /// <param name="textSize">Default text size for the string "9999 m"</param>
         /// <param name="textSize1">Size of upper text of scalebar</param>
         /// <param name="textSize2">Size of lower text of scalebar</param>
         /// <param name="stroke">Width of line</param>
@@ -512,9 +512,9 @@ namespace Mapsui.Widgets.ScaleBar
             Map map, IReadOnlyViewport viewport, float width, IUnitConverter unitConverter)
         {
             // We have to calc the angle difference to the equator (angle = 0), 
-            // because EPSG:3857 is only there 1 m. At othere angles, we
+            // because EPSG:3857 is only there 1 m. At other angles, we
             // should calculate the correct length.
-            var position = (Point)map.Transformation.Transform(map.CRS, "EPSG:4326", ((Point)viewport.Center).Clone()); // clone or else you will transform the orginal viewport center
+            var position = (Point)map.Transformation.Transform(map.CRS, "EPSG:4326", ((Point)viewport.Center).Clone()); // clone or else you will transform the original viewport center
 
             // Calc ground resolution in meters per pixel of viewport for this latitude
             double groundResolution = viewport.Resolution * Math.Cos(position.Y / 180.0 * Math.PI);

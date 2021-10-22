@@ -1,5 +1,6 @@
 ﻿using Mapsui.Geometries;
 using Mapsui.Providers;
+using Mapsui.Rendering.Skia.Extensions;
 using Mapsui.Styles;
 using SkiaSharp;
 
@@ -7,14 +8,14 @@ namespace Mapsui.Rendering.Skia
 {
     internal static class PolygonRenderer
     {
-        public static void Draw(SKCanvas canvas, IReadOnlyViewport viewport, IStyle style, IFeature feature, IGeometry geometry,
+        public static void Draw(SKCanvas canvas, IReadOnlyViewport viewport, IStyle style, IGeometryFeature feature, IGeometry geometry,
             float opacity, SymbolCache symbolCache = null)
         {
             if (style is LabelStyle labelStyle)
             {
                 var worldCenter = geometry.BoundingBox.Centroid;
                 var center = viewport.WorldToScreen(worldCenter);
-                LabelRenderer.Draw(canvas, labelStyle, feature, (float)center.X, (float)center.Y, opacity);
+                LabelRenderer.Draw(canvas, labelStyle, feature, center, opacity);
             }
             else if (style is StyleCollection styleCollection)
             {
@@ -35,7 +36,8 @@ namespace Mapsui.Rendering.Skia
                 var strokeMiterLimit = 4f; // default
                 var strokeStyle = PenStyle.Solid; // default
                 float[] dashArray = null; // default
-      
+                float dashOffset = 0; // default
+
                 if (vectorStyle.Outline != null)
                 {
                     lineWidth = (float)vectorStyle.Outline.Width;
@@ -45,6 +47,7 @@ namespace Mapsui.Rendering.Skia
                     strokeMiterLimit = vectorStyle.Outline.StrokeMiterLimit;
                     strokeStyle = vectorStyle.Outline.PenStyle;
                     dashArray = vectorStyle.Outline.DashArray;
+                    dashOffset = vectorStyle.Outline.DashOffset;
                 }
 
                 if (vectorStyle.Fill != null)
@@ -73,7 +76,7 @@ namespace Mapsui.Rendering.Skia
                         paintFill.Color = fillColor.ToSkia(opacity);
                         var scale = 10.0f;
                         var fillPath = new SKPath();
-                        var matrix = SKMatrix.MakeScale(scale, scale);
+                        var matrix = SKMatrix.CreateScale(scale, scale);
 
                         switch (vectorStyle.Fill?.FillStyle)
                         {
@@ -128,7 +131,7 @@ namespace Mapsui.Rendering.Skia
                                 if (image != null)
                                     paintFill.Shader = image.ToShader(SKShaderTileMode.Repeat,
                                         SKShaderTileMode.Repeat,
-                                        SKMatrix.MakeRotation((float)(viewport.Rotation * System.Math.PI / 180.0f), image.Width >> 1, image.Height >> 1));
+                                        SKMatrix.CreateRotation((float)(viewport.Rotation * System.Math.PI / 180.0f), image.Width >> 1, image.Height >> 1));
                                 break;
                             default:
                                 paintFill.PathEffect = null;
@@ -159,7 +162,7 @@ namespace Mapsui.Rendering.Skia
                             paintStroke.StrokeJoin = strokeJoin.ToSkia();
                             paintStroke.StrokeMiter = strokeMiterLimit;
                             if (strokeStyle != PenStyle.Solid)
-                                paintStroke.PathEffect = strokeStyle.ToSkia(lineWidth, dashArray);
+                                paintStroke.PathEffect = strokeStyle.ToSkia(lineWidth, dashArray, dashOffset);
                             else
                                 paintStroke.PathEffect = null;
                             canvas.DrawPath(path, paintStroke);

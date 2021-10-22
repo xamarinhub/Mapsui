@@ -10,7 +10,7 @@ namespace Mapsui.Styles
             Fill = new Brush { Color = Color.White };
         }
         /// <summary>
-        /// Linestyle for line geometries
+        /// Line style for line geometries
         /// </summary>
         public Pen Line { get; set; }
 
@@ -20,17 +20,17 @@ namespace Mapsui.Styles
         public Pen Outline { get; set; }
 
         /// <summary>
-        /// Fillstyle for Polygon geometries
+        /// Fill style for Polygon geometries
         /// </summary>
         public Brush Fill { get; set; }
         
         public override bool Equals(object obj)
         {
-            if (!(obj is VectorStyle))
+            if (!(obj is VectorStyle style))
             {
                 return false;
             }
-            return Equals((VectorStyle)obj);
+            return Equals(style);
         }
 
         public bool Equals(VectorStyle vectorStyle)

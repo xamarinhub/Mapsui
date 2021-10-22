@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Mapsui.Geometries;
 using Mapsui.Providers;
+using Mapsui.Rendering.Skia.Extensions;
 using Mapsui.Styles;
 using SkiaSharp;
 
@@ -21,7 +23,7 @@ namespace Mapsui.Rendering.Skia
             IsEmbeddedBitmapText = true
         };
 
-        public static void DrawAsBitmap(SKCanvas canvas, LabelStyle style, IFeature feature, float x, float y, float layerOpacity)
+        public static void DrawAsBitmap(SKCanvas canvas, LabelStyle style, IGeometryFeature feature, float x, float y, float layerOpacity)
         {
             var text = style.GetLabelText(feature);
 
@@ -35,17 +37,17 @@ namespace Mapsui.Rendering.Skia
             var offsetX = style.Offset.IsRelative ? info.Width * style.Offset.X : style.Offset.X;
             var offsetY = style.Offset.IsRelative ? info.Height * style.Offset.Y : style.Offset.Y;
 
-            BitmapHelper.RenderBitmap(canvas, info.Bitmap, (int)Math.Round(x), (int)Math.Round(y),
+            BitmapRenderer.Draw(canvas, info.Bitmap, (int)Math.Round(x), (int)Math.Round(y),
                 offsetX: (float)offsetX, offsetY: (float)-offsetY,
                 horizontalAlignment: style.HorizontalAlignment, verticalAlignment: style.VerticalAlignment);
         }
 
-        public static void Draw(SKCanvas canvas, LabelStyle style, IFeature feature, float x, float y,
+        public static void Draw(SKCanvas canvas, LabelStyle style, IGeometryFeature feature, Point destination,
             float layerOpacity)
         {
             var text = style.GetLabelText(feature);
             if (string.IsNullOrEmpty(text)) return;
-            DrawLabel(canvas, x, y, style, text, layerOpacity);
+            DrawLabel(canvas, (float)destination.X, (float)destination.Y, style, text, layerOpacity);
         }
 
         private static SKImage CreateLabelAsBitmap(LabelStyle style, string text, float layerOpacity)
@@ -271,10 +273,13 @@ namespace Mapsui.Rendering.Skia
 
         private static void UpdatePaint(LabelStyle style, float layerOpacity)
         {
-            if (!CacheTypeface.TryGetValue(style.Font.FontFamily, out SKTypeface typeface))
+            if (!CacheTypeface.TryGetValue(style.Font.ToString(), out SKTypeface typeface))
             {
-                typeface = SKTypeface.FromFamilyName(style.Font.FontFamily);
-                CacheTypeface[style.Font.FontFamily] = typeface;
+                typeface = SKTypeface.FromFamilyName(style.Font.FontFamily,
+                    style.Font.Bold ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal,
+                    SKFontStyleWidth.Normal,
+                    style.Font.Italic ? SKFontStyleSlant.Italic : SKFontStyleSlant.Upright);
+                CacheTypeface[style.Font.ToString()] = typeface;
             }
 
             Paint.Style = SKPaintStyle.Fill;

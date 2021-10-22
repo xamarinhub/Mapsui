@@ -1,10 +1,7 @@
-﻿using Mapsui.Layers;
-using Mapsui.Samples.Common;
+﻿using Mapsui.Samples.Common;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Xamarin.Forms;
 using Xamarin.Forms.Xaml;
 
@@ -23,14 +20,9 @@ namespace Mapsui.Samples.Forms
             allSamples = AllSamples.GetSamples();
 
             var categories = allSamples.Select(s => s.Category).Distinct().OrderBy(c => c);
-            foreach (var category in categories)
-            {
-                picker.Items?.Add(category);
-            }
+            picker.ItemsSource = categories.ToList<string>();
             picker.SelectedIndexChanged += PickerSelectedIndexChanged;
             picker.SelectedItem = "Forms";
-
-            listView.ItemsSource = allSamples.Select(k => k.Name).ToList();
         }
 
         private void FillListWithSamples()
