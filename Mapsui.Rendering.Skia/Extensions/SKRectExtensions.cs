@@ -1,13 +1,12 @@
-﻿using Mapsui.Geometries;
-using SkiaSharp;
+﻿using SkiaSharp;
 
 namespace Mapsui.Rendering.Skia.Extensions
 {
-    static class SKRectExtensions
+    internal static class SKRectExtensions
     {
-        public static BoundingBox ToMapsui(this SKRect rect)
+        public static MRect ToMRect(this SKRect rect)
         {
-            return new BoundingBox(rect.Left, rect.Top, rect.Right, rect.Bottom);
+            return new MRect(rect.Left, rect.Top, rect.Right, rect.Bottom);
         }
     }
 }

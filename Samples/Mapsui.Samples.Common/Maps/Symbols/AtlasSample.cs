@@ -1,13 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Reflection;
-using Mapsui.Geometries;
+using System.Linq;
+using System.Threading.Tasks;
+using Mapsui.Extensions;
 using Mapsui.Layers;
 using Mapsui.Providers;
 using Mapsui.Samples.Common.Helpers;
 using Mapsui.Styles;
+using Mapsui.Tiling;
 using Mapsui.UI;
-using Mapsui.Utilities;
 
 namespace Mapsui.Samples.Common.Maps
 {
@@ -15,62 +16,48 @@ namespace Mapsui.Samples.Common.Maps
     {
         private const string AtlasLayerName = "Atlas Layer";
         private static int _atlasBitmapId;
-        private static readonly Random Random = new Random();
+        private static readonly Random Random = new Random(1);
 
         public string Name => "Atlas";
 
         public string Category => "Symbols";
 
-        public void Setup(IMapControl mapControl)
+        public Task<Map> CreateMapAsync()
         {
-            mapControl.Map = CreateMap();
-        }
-
-        public static Map CreateMap()
-        {
-            _atlasBitmapId = BitmapRegistry.Instance.Register(typeof(AtlasSample).GetTypeInfo().Assembly.GetManifestResourceStream("Mapsui.Samples.Common.Images.osm-liberty.png"));
-
+            _atlasBitmapId = typeof(AtlasSample).LoadBitmapId("Images.osm-liberty.png");
             var map = new Map();
 
             map.Layers.Add(OpenStreetMap.CreateTileLayer());
-            map.Layers.Add(CreateAtlasLayer(map.Envelope));
-           
-            return map;
+            map.Layers.Add(CreateAtlasLayer(map.Extent));
+
+            return Task.FromResult(map);
         }
 
-        private static ILayer CreateAtlasLayer(BoundingBox envelope)
+        private static ILayer CreateAtlasLayer(MRect? envelope)
         {
             return new MemoryLayer
             {
                 Name = AtlasLayerName,
-                DataSource = CreateMemoryProviderWithDiverseSymbols(envelope, 1000),
+                Features = CreateAtlasFeatures(RandomPointGenerator.GenerateRandomPoints(envelope, 1000)),
                 Style = null,
                 IsMapInfoLayer = true
             };
         }
 
-        public static MemoryProvider<IGeometryFeature> CreateMemoryProviderWithDiverseSymbols(BoundingBox envelope, int count = 100)
+        private static IEnumerable<IFeature> CreateAtlasFeatures(IEnumerable<MPoint> randomPoints)
         {
-            return new MemoryProvider<IGeometryFeature>(CreateAtlasFeatures(RandomPointHelper.GenerateRandomPoints(envelope, count)));
-        }
-
-        private static IEnumerable<IGeometryFeature> CreateAtlasFeatures(IEnumerable<IGeometry> randomPoints)
-        {
-            var features = new List<IGeometryFeature>();
             var counter = 0;
-            foreach (var point in randomPoints)
-            {
-                var feature = new Feature { Geometry = point, ["Label"] = counter.ToString() };
+
+            return randomPoints.Select(p => {
+                var feature = new PointFeature(p) { ["Label"] = counter.ToString() };
 
                 var x = 0 + Random.Next(0, 12) * 21;
                 var y = 64 + Random.Next(0, 6) * 21;
                 var bitmapId = BitmapRegistry.Instance.Register(new Sprite(_atlasBitmapId, x, y, 21, 21, 1));
                 feature.Styles.Add(new SymbolStyle { BitmapId = bitmapId });
-
-                features.Add(feature);
                 counter++;
-            }
-            return features;
+                return feature;
+            }).ToList();
         }
     }
 }

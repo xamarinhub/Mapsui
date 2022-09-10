@@ -1,4 +1,5 @@
-﻿using Mapsui.Geometries;
+﻿using System;
+using System.Linq;
 using Mapsui.Rendering.Skia.Extensions;
 using Mapsui.Widgets;
 using Mapsui.Widgets.ScaleBar;
@@ -6,18 +7,18 @@ using SkiaSharp;
 
 namespace Mapsui.Rendering.Skia.SkiaWidgets
 {
-    public class ScaleBarWidgetRenderer : ISkiaWidgetRenderer
+    public class ScaleBarWidgetRenderer : ISkiaWidgetRenderer, IDisposable
     {
-        private SKPaint _paintScaleBar;
-        private SKPaint _paintScaleBarStroke;
-        private SKPaint _paintScaleText;
-        private SKPaint _paintScaleTextStroke;
+        private SKPaint? _paintScaleBar;
+        private SKPaint? _paintScaleBarStroke;
+        private SKPaint? _paintScaleText;
+        private SKPaint? _paintScaleTextStroke;
 
-        public void Draw(SKCanvas canvas, IReadOnlyViewport viewport,  IWidget widget,
+        public void Draw(SKCanvas canvas, IReadOnlyViewport viewport, IWidget widget,
             float layerOpacity)
         {
-            var scaleBar = (ScaleBarWidget) widget;
-            if (!scaleBar.CanTransform()) return;
+            var scaleBar = (ScaleBarWidget)widget;
+            if (!scaleBar.CanProject()) return;
 
             // If this is the first time, we call this renderer, ...
             if (_paintScaleBar == null)
@@ -32,28 +33,28 @@ namespace Mapsui.Rendering.Skia.SkiaWidgets
             // Update paints with new values
             _paintScaleBar.Color = scaleBar.TextColor.ToSkia(layerOpacity);
             _paintScaleBar.StrokeWidth = scaleBar.StrokeWidth * scaleBar.Scale;
-            _paintScaleBarStroke.Color = scaleBar.Halo.ToSkia(layerOpacity);
+            _paintScaleBarStroke!.Color = scaleBar.Halo.ToSkia(layerOpacity);
             _paintScaleBarStroke.StrokeWidth = scaleBar.StrokeWidthHalo * scaleBar.Scale;
-            _paintScaleText.Color = scaleBar.TextColor.ToSkia(layerOpacity);
+            _paintScaleText!.Color = scaleBar.TextColor.ToSkia(layerOpacity);
             _paintScaleText.StrokeWidth = scaleBar.StrokeWidth * scaleBar.Scale;
-            _paintScaleText.Typeface = SKTypeface.FromFamilyName(scaleBar.Font.FontFamily, 
+            _paintScaleText.Typeface = SKTypeface.FromFamilyName(scaleBar.Font?.FontFamily,
                 SKFontStyleWeight.Bold, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright);
-            _paintScaleText.TextSize = (float)scaleBar.Font.Size * scaleBar.Scale;
-            _paintScaleTextStroke.Color = scaleBar.Halo.ToSkia(layerOpacity);
+            _paintScaleText.TextSize = (float)(scaleBar.Font?.Size ?? 10) * scaleBar.Scale;
+            _paintScaleTextStroke!.Color = scaleBar.Halo.ToSkia(layerOpacity);
             _paintScaleTextStroke.StrokeWidth = scaleBar.StrokeWidthHalo / 2 * scaleBar.Scale;
-            _paintScaleTextStroke.Typeface = SKTypeface.FromFamilyName(scaleBar.Font.FontFamily, 
+            _paintScaleTextStroke.Typeface = SKTypeface.FromFamilyName(scaleBar.Font?.FontFamily,
                 SKFontStyleWeight.Bold, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright);
-            _paintScaleTextStroke.TextSize = (float)scaleBar.Font.Size * scaleBar.Scale;
+            _paintScaleTextStroke.TextSize = (float)(scaleBar.Font?.Size ?? 10) * scaleBar.Scale;
 
             float scaleBarLength1;
-            string scaleBarText1;
+            string? scaleBarText1;
             float scaleBarLength2;
-            string scaleBarText2;
+            string? scaleBarText2;
 
             (scaleBarLength1, scaleBarText1, scaleBarLength2, scaleBarText2) = scaleBar.GetScaleBarLengthAndText(viewport);
 
             // Calc height of scale bar
-            SKRect textSize = SKRect.Empty;
+            var textSize = SKRect.Empty;
 
             // Do this, because height of text changes sometimes (e.g. from 2 m to 1 m)
             _paintScaleTextStroke.MeasureText("9999 m", ref textSize);
@@ -76,65 +77,59 @@ namespace Mapsui.Rendering.Skia.SkiaWidgets
             // Get lines for scale bar
             var points = scaleBar.GetScaleBarLinePositions(viewport, scaleBarLength1, scaleBarLength2, scaleBar.StrokeWidthHalo);
 
-            // BoundingBox for scale bar
-            BoundingBox envelop = new BoundingBox();
-
-            if (points != null)
+            // Draw outline of scale bar
+            for (var i = 0; i < points.Count; i += 2)
             {
-                // Draw outline of scale bar
-                for (int i = 0; i < points.Length; i += 2)
-                {
-                    canvas.DrawLine((float)points[i].X, (float)points[i].Y, (float)points[i + 1].X, (float)points[i + 1].Y, _paintScaleBarStroke);
-                }
-
-                // Draw scale bar
-                for (int i = 0; i < points.Length; i += 2)
-                {
-                    canvas.DrawLine((float)points[i].X, (float)points[i].Y, (float)points[i + 1].X, (float)points[i + 1].Y, _paintScaleBar);
-                }
-
-                envelop = points[0].BoundingBox;
-
-                for (int i = 1; i < points.Length; i++)
-                {
-                    envelop = envelop.Join(points[i].BoundingBox);
-                }
-
-                envelop = envelop.Grow(scaleBar.StrokeWidthHalo * 0.5f * scaleBar.Scale);
+                canvas.DrawLine((float)points[i].X, (float)points[i].Y, (float)points[i + 1].X, (float)points[i + 1].Y, _paintScaleBarStroke);
             }
+
+            // Draw scale bar
+            for (var i = 0; i < points.Count; i += 2)
+            {
+                canvas.DrawLine((float)points[i].X, (float)points[i].Y, (float)points[i + 1].X, (float)points[i + 1].Y, _paintScaleBar);
+            }
+
+            if (!points.Any()) throw new NotImplementedException($"A {nameof(ScaleBarWidget)} can not be drawn without line positions");
+
+            var envelop = new MRect(points.Select(p => p.MRect));
+            envelop = envelop.Grow(scaleBar.StrokeWidthHalo * 0.5f * scaleBar.Scale);
 
             // Draw text
 
             // Calc text height
-            SKRect textSize1 = SKRect.Empty;
-            SKRect textSize2 = SKRect.Empty;
+            var textSize1 = SKRect.Empty;
+            var textSize2 = SKRect.Empty;
 
-            scaleBarText1 = scaleBarText1 ?? string.Empty;
+            scaleBarText1 ??= string.Empty;
             _paintScaleTextStroke.MeasureText(scaleBarText1, ref textSize1);
-            
-            var (posX1, posY1, posX2, posY2) = scaleBar.GetScaleBarTextPositions(viewport, textSize.ToMapsui(), textSize1.ToMapsui(), textSize2.ToMapsui(), scaleBar.StrokeWidthHalo);
+
+            if (scaleBar.ScaleBarMode == ScaleBarMode.Both && scaleBar.SecondaryUnitConverter != null)
+            {
+                // If there is SecondaryUnitConverter we need to calculate the size before passing it into GetScaleBarTextPositions
+                scaleBarText2 ??= string.Empty;
+                _paintScaleTextStroke.MeasureText(scaleBarText2, ref textSize2);
+            }
+
+            var (posX1, posY1, posX2, posY2) = scaleBar.GetScaleBarTextPositions(viewport, textSize.ToMRect(), textSize1.ToMRect(), textSize2.ToMRect(), scaleBar.StrokeWidthHalo);
 
             // Now draw text
             canvas.DrawText(scaleBarText1, posX1, posY1 - textSize1.Top, _paintScaleTextStroke);
             canvas.DrawText(scaleBarText1, posX1, posY1 - textSize1.Top, _paintScaleText);
 
-            envelop = envelop.Join(new BoundingBox(posX1, posY1, posX1 + textSize1.Width, posY1 + textSize1.Height));
+            envelop = envelop?.Join(new MRect(posX1, posY1, posX1 + textSize1.Width, posY1 + textSize1.Height));
 
             if (scaleBar.ScaleBarMode == ScaleBarMode.Both && scaleBar.SecondaryUnitConverter != null)
             {
                 // Now draw second text
-                scaleBarText2 = scaleBarText2 ?? string.Empty;
-                _paintScaleTextStroke.MeasureText(scaleBarText2, ref textSize2);
-
                 canvas.DrawText(scaleBarText2, posX2, posY2 - textSize2.Top, _paintScaleTextStroke);
                 canvas.DrawText(scaleBarText2, posX2, posY2 - textSize2.Top, _paintScaleText);
 
-                envelop = envelop.Join(new BoundingBox(posX2, posY2, posX2 + textSize2.Width, posY2 + textSize2.Height));
+                envelop = envelop?.Join(new MRect(posX2, posY2, posX2 + textSize2.Width, posY2 + textSize2.Height));
             }
 
             scaleBar.Envelope = envelop;
 
-            if (scaleBar.ShowEnvelop)
+            if (scaleBar.ShowEnvelop && envelop != null)
             {
                 // Draw a rect around the scale bar for testing
                 var tempPaint = _paintScaleTextStroke;
@@ -158,6 +153,14 @@ namespace Mapsui.Rendering.Skia.SkiaWidgets
                 Style = style,
                 IsAntialias = true
             };
+        }
+
+        public virtual void Dispose()
+        {
+            _paintScaleBar?.Dispose();
+            _paintScaleBarStroke?.Dispose();
+            _paintScaleText?.Dispose();
+            _paintScaleTextStroke?.Dispose();
         }
     }
 }

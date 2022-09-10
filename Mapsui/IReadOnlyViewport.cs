@@ -1,16 +1,18 @@
 ﻿using System.ComponentModel;
-using Mapsui.Geometries;
 
 namespace Mapsui
 {
-    public interface IReadOnlyViewport 
+    public interface IReadOnlyViewport
     {
         event PropertyChangedEventHandler ViewportChanged;
 
         /// <summary>
         /// Coordinate of center of viewport in map coordinates
         /// </summary>
-        ReadOnlyPoint Center { get; } // todo: the point itself has X and Y values that can be set. 
+        MReadOnlyPoint Center { get; }
+
+        double CenterX { get; }
+        double CenterY { get; }
 
         /// <summary>
         /// Resolution of the viewport in units per pixel
@@ -25,13 +27,13 @@ namespace Mapsui
         double Resolution { get; }
 
         /// <summary>
-        /// BoundingBox of viewport in map coordinates respecting Rotation
+        /// MRect of viewport in map coordinates respecting Rotation
         /// </summary>
         /// <remarks>
-        /// This BoundingBox is horizontally and vertically aligned, even if the viewport
-        /// is rotated. So this BoundingBox perhaps contain parts, that are not visible.
+        /// This MRect is horizontally and vertically aligned, even if the viewport
+        /// is rotated. So this MRect perhaps contain parts, that are not visible.
         /// </remarks>
-        BoundingBox Extent { get; }
+        MRect? Extent { get; }
 
         /// <summary>
         /// Width of viewport in screen pixels
@@ -49,7 +51,7 @@ namespace Mapsui
         double Rotation { get; }
 
         bool HasSize { get; }
-        
+
         /// <summary>
         /// IsRotated is true, when viewport displays map rotated
         /// </summary>
@@ -59,24 +61,32 @@ namespace Mapsui
         /// Converts a point in screen pixels to one in map units, respecting rotation
         /// </summary>
         /// <param name="position">Coordinate in map units</param>
-        /// <returns>Point in map units</returns>
-        Point ScreenToWorld(Point position);
+        /// <returns>MPoint in map units</returns>
+        MPoint ScreenToWorld(MPoint position);
 
         /// <summary>
         /// Converts X/Y in screen pixels to a point in map units, respecting rotation
         /// </summary>
         /// <param name="x">Screen position x coordinate</param>
         /// <param name="y">Screen position y coordinate</param>
-        /// <returns>Point in map units</returns>
-        Point ScreenToWorld(double x, double y);
+        /// <returns>MPoint in map units</returns>
+        MPoint ScreenToWorld(double x, double y);
+
+        /// <summary>
+        /// Converts X/Y in screen pixels to a point in map units, respecting rotation
+        /// </summary>
+        /// <param name="x">Screen position x coordinate</param>
+        /// <param name="y">Screen position y coordinate</param>
+        /// <returns>Tuple of x and y in world coordintes</returns>
+        (double worldX, double worldY) ScreenToWorldXY(double x, double y);
 
         /// <summary>
         /// Converts X/Y in map units to a point in device independent unit (or DIP or DP),
         /// respecting rotation
         /// </summary>
         /// <param name="worldPosition">Coordinate in map units</param>
-        /// <returns>Point in screen pixels</returns>
-        Point WorldToScreen(Point worldPosition);
+        /// <returns>MPoint in screen pixels</returns>
+        MPoint WorldToScreen(MPoint worldPosition);
 
         /// <summary>
         /// Converts X/Y in map units to a point in device independent units (or DIP or DP),
@@ -84,8 +94,8 @@ namespace Mapsui
         /// </summary>
         /// <param name="worldX">X coordinate in map units</param>
         /// <param name="worldY">Y coordinate in map units</param>
-        /// <returns>Point in screen pixels</returns>
-        Point WorldToScreen(double worldX, double worldY);
+        /// <returns>MPoint in screen pixels</returns>
+        MPoint WorldToScreen(double worldX, double worldY);
 
         /// <summary>
         /// Converts X/Y in map units to a point in device independent units (or DIP or DP),
@@ -93,24 +103,16 @@ namespace Mapsui
         /// </summary>
         /// <param name="worldX">X coordinate in map units</param>
         /// <param name="worldY">Y coordinate in map units</param>
-        /// <returns>Point in screen pixels</returns>
-        Point WorldToScreenUnrotated(double worldX, double worldY); // todo: Get rid of this method
+        /// <returns>Tuple of x and y in screen coordinates</returns>
+        (double screenX, double screenY) WorldToScreenXY(double worldX, double worldY);
 
         /// <summary>
         /// Converts X/Y in map units to a point in device independent units (or DIP or DP),
         /// respecting rotation
         /// </summary>
-        /// <param name="worldPosition">Coordinate in map units</param>
-        /// <returns>Point in screen pixels</returns>
-        Point WorldToScreenUnrotated(Point worldPosition); // todo: Get rid of this method
-
-        /// <summary>
-        /// WindowExtend gives the four corner points of viewport in map coordinates
-        /// </summary>
-        /// <remarks>
-        /// If viewport is rotated, this corner points are not horizontally or vertically
-        /// aligned.
-        /// </remarks>
-        Quad WindowExtent { get; }
+        /// <param name="worldX">X coordinate in map units</param>
+        /// <param name="worldY">Y coordinate in map units</param>
+        /// <returns>The x and y in screen pixels</returns>
+        (double screenX, double screenY) WorldToScreenUnrotated(double worldX, double worldY); // todo: Get rid of this method
     }
 }

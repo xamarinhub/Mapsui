@@ -6,7 +6,7 @@ skip_commits:
     - docfx/**/*
     - logo/**/*
     - '**/*.md'
-image: Visual Studio 2019
+image: Visual Studio 2022
 assembly_info:
   patch: true
   file: '**\AssemblyInfo.*'
@@ -14,13 +14,18 @@ assembly_info:
   assembly_file_version: '{version}'
   assembly_informational_version: '{version}'
 environment:
-  version-short: 3.0.0  
+  version-short: 4.0.0  
 nuget:
   disable_publish_on_pr: true
+cache:
+- '%USERPROFILE%\.nuget\packages -> **.sln, **.csproj'  # preserve nuget folder (packages) unless the solution or projects change
 install:
-- cmd: '"C:/Program Files (x86)/Android/android-sdk/tools/bin/sdkmanager.bat" "platforms;android-30"'
+- ps: Invoke-WebRequest 'https://dot.net/v1/dotnet-install.ps1' -OutFile 'dotnet-install.ps1';
+- ps: ./dotnet-install.ps1 -Version 6.0.301 -InstallDir "dotnetcli"
+- cmd: dotnet workload install maui macos android ios maccatalyst
+- cmd: '"C:/Program Files (x86)/Android/android-sdk/tools/bin/sdkmanager.bat" "platforms;android-31"'
 before_build:
-- cmd: nuget restore mapsui.sln
+- cmd: .nuget\nuget restore mapsui.sln -Verbosity quiet
 build:
   project: Mapsui.sln
   verbosity: minimal

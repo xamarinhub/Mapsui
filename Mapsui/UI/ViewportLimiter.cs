@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using Mapsui.Geometries;
 
 namespace Mapsui.UI
 {
@@ -45,18 +44,18 @@ namespace Mapsui.UI
         public ZoomMode ZoomMode { get; set; } = ZoomMode.KeepWithinResolutions;
 
         /// <summary>
-        /// Set this property in combination KeepCenterWithinExtents or KeepViewportWithinExtents.
+        /// Sets the limit to which the user can pan the map.
         /// If PanLimits is not set, Map.Extent will be used as restricted extent.
         /// </summary>
-        public BoundingBox PanLimits { get; set; }
+        public MRect? PanLimits { get; set; }
 
         /// <summary>
         /// Pair of the limits for the resolutions (smallest and biggest). If ZoomMode is set 
         /// to anything else than None, resolution is kept between these values.
         /// </summary>
-        public MinMax ZoomLimits { get; set; }
+        public MinMax? ZoomLimits { get; set; }
 
-        private MinMax GetExtremes(IReadOnlyList<double> resolutions)
+        private MinMax? GetExtremes(IReadOnlyList<double>? resolutions)
         {
             if (resolutions == null || resolutions.Count == 0) return null;
             resolutions = resolutions.OrderByDescending(r => r).ToList();
@@ -65,14 +64,14 @@ namespace Mapsui.UI
             return new MinMax(mostZoomedOut, mostZoomedIn);
         }
 
-        public void Limit(IViewport viewport, IReadOnlyList<double> mapResolutions, BoundingBox mapEnvelope)
+        public void Limit(Viewport viewport, IReadOnlyList<double> mapResolutions, MRect? mapEnvelope)
         {
             viewport.SetResolution(LimitResolution(viewport.Resolution, viewport.Width, viewport.Height, mapResolutions, mapEnvelope));
-            LimitExtent(viewport,  mapEnvelope);
+            LimitExtent(viewport, mapEnvelope);
         }
 
-        public double LimitResolution(double resolution, double screenWidth, double screenHeight,  
-            IReadOnlyList<double> mapResolutions, BoundingBox mapEnvelope)
+        public double LimitResolution(double resolution, double screenWidth, double screenHeight,
+            IReadOnlyList<double> mapResolutions, MRect? mapEnvelope)
         {
             if (ZoomMode == ZoomMode.Unlimited) return resolution;
 
@@ -87,26 +86,27 @@ namespace Mapsui.UI
 
             return resolution;
         }
-        
-        public void LimitExtent(IViewport viewport, BoundingBox mapEnvelope)
+
+        public void LimitExtent(Viewport viewport, MRect? mapEnvelope)
         {
             var maxExtent = PanLimits ?? mapEnvelope;
             if (maxExtent == null)
             {
                 // Can be null because both panLimits and Map.Extent can be null. 
                 // The Map.Extent can be null if the extent of all layers is null
-                return; 
+                return;
             }
 
             var x = viewport.Center.X;
-            if (viewport.Center.X < maxExtent.Left)  x = maxExtent.Left;
+            if (viewport.Center.X < maxExtent.Left) x = maxExtent.Left;
             if (viewport.Center.X > maxExtent.Right) x = maxExtent.Right;
 
             var y = viewport.Center.Y;
             if (viewport.Center.Y > maxExtent.Top) y = maxExtent.Top;
             if (viewport.Center.Y < maxExtent.Bottom) y = maxExtent.Bottom;
 
-            viewport.SetCenter(x, y);
+            viewport.CenterX = x;
+            viewport.CenterY = y;
         }
     }
 }

@@ -1,49 +1,48 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Mapsui.Geometries;
 using Mapsui.Layers;
+using Mapsui.Nts;
 using Mapsui.Providers;
+using Mapsui.Tiling;
 using Mapsui.UI;
-using Mapsui.Utilities;
+using NetTopologySuite.Geometries;
 
 namespace Mapsui.Samples.Common.Maps
 {
-    public class MutatingTriangleSample : ISample
+    public sealed class MutatingTriangleSample : ISample, ISampleTest, IDisposable
     {
         public string Name => "Mutating triangle";
         public string Category => "Special";
 
-        public void Setup(IMapControl mapControl)
-        {
-            mapControl.Map = CreateMap();
-        }
-
         private static readonly Random Random = new Random(0);
+        private static CancellationTokenSource? _cancelationTokenSource;
 
-        public static Map CreateMap()
+        [SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP007:Don\'t dispose injected")]
+        public Task<Map> CreateMapAsync()
         {
+            _cancelationTokenSource?.Dispose();
+            _cancelationTokenSource = new CancellationTokenSource();
             var map = new Map();
             map.Layers.Add(OpenStreetMap.CreateTileLayer());
-            map.Layers.Add(CreateMutatingTriangleLayer(map.Envelope));
-            return map;
+            map.Layers.Add(CreateMutatingTriangleLayer(map.Extent));
+            return Task.FromResult(map);
         }
 
-        private static ILayer CreateMutatingTriangleLayer(BoundingBox envelope)
-        {   
+        private static ILayer CreateMutatingTriangleLayer(MRect? envelope)
+        {
             var layer = new MemoryLayer();
-           
-            var polygon = new Polygon(new LinearRing(GenerateRandomPoints(envelope, 3)));
-            var feature = new Feature() { Geometry = polygon };
-            var features = new List<IGeometryFeature>();
-            features.Add(feature);
 
-            layer.DataSource = new MemoryProvider<IGeometryFeature>(features);
+            var polygon = new Polygon(new LinearRing(GenerateRandomPoints(envelope, 3).ToArray()));
+            var feature = new GeometryFeature(polygon);
+            layer.Features = new List<IFeature> { feature };
 
-            PeriodicTask.Run(() =>
+            PeriodicTask.RunAsync(() =>
             {
-                polygon.ExteriorRing = new LinearRing(GenerateRandomPoints(envelope, 3));
+                feature.Geometry = new Polygon(new LinearRing(GenerateRandomPoints(envelope, 3).ToArray()));
                 // Clear cache for change to show
                 feature.RenderedGeometry.Clear();
                 // Trigger DataChanged notification
@@ -54,39 +53,61 @@ namespace Mapsui.Samples.Common.Maps
             return layer;
         }
 
-        public static IEnumerable<Point> GenerateRandomPoints(BoundingBox envelope, int count = 25)
+        public static IEnumerable<Coordinate> GenerateRandomPoints(MRect? envelope, int count = 25)
         {
-            var result = new List<Point>();
+            var result = new List<Coordinate>();
+            if (envelope == null)
+                return result;
 
             for (var i = 0; i < count; i++)
             {
-                result.Add(new Point(
+                result.Add(new Coordinate(
                     Random.NextDouble() * envelope.Width + envelope.Left,
                     Random.NextDouble() * envelope.Height + envelope.Bottom));
             }
 
-            result.Add(result[0]); // close polygon by adding start point.
+            result.Add(result[0].Copy()); // close polygon by adding start point.
 
             return result;
         }
 
         public class PeriodicTask
         {
-            public static async Task Run(Action action, TimeSpan period, CancellationToken cancellationToken)
+            public static async Task RunAsync(Action action, TimeSpan period, CancellationToken? cancellationToken)
             {
-                while (!cancellationToken.IsCancellationRequested)
+                while (!(cancellationToken?.IsCancellationRequested ?? false))
                 {
-                    await Task.Delay(period, cancellationToken);
+                    if (cancellationToken == null)
+                    {
+                        await Task.Delay(period);
+                    }
+                    else
+                    {
+                        await Task.Delay(period, cancellationToken.Value);
+                    }
 
-                    if (!cancellationToken.IsCancellationRequested)
+                    if (!(cancellationToken?.IsCancellationRequested ?? false))
                         action();
                 }
             }
 
-            public static Task Run(Action action, TimeSpan period)
+            public static Task RunAsync(Action action, TimeSpan period)
             {
-                return Run(action, period, CancellationToken.None);
+                return RunAsync(action, period, _cancelationTokenSource?.Token);
             }
+        }
+
+        public Task InitializeTestAsync()
+        {
+            _cancelationTokenSource?.Cancel();
+            return Task.CompletedTask;
+        }
+
+        [SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP007:Don\'t dispose injected")]
+        public void Dispose()
+        {
+            _cancelationTokenSource?.Cancel();
+            _cancelationTokenSource?.Dispose();
         }
     }
 }

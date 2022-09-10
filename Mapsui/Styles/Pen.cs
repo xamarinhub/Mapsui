@@ -3,7 +3,7 @@ namespace Mapsui.Styles
 {
     public class Pen
     {
-        public Pen() {}
+        public Pen() : this(Color.Transparent) { }
 
         public Pen(Color color, double width = 1)
         {
@@ -30,7 +30,7 @@ namespace Mapsui.Styles
         /// Array for drawing user defined dashes. Should be even and values are 
         /// multiplied by line width before drawing.
         /// </summary>
-        public float[] DashArray { get; set; } = null;
+        public float[]? DashArray { get; set; } = null;
 
         /// <summary>
         /// Offset for drawing user defined dashes
@@ -52,20 +52,19 @@ namespace Mapsui.Styles
         /// </summary>
         public float StrokeMiterLimit { get; set; } = 10f; // Default on Wpf, on Skia, it is 4f
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
-            if (!(obj is Pen pen))
-            {
-                return false;
-            }
-            return Equals(pen);
+            return obj is Pen pen && Equals(pen);
         }
 
-        public bool Equals(Pen pen)
+        public bool Equals(Pen? pen)
         {
+            if (pen == null)
+                return false;
+
             // ReSharper disable once CompareOfFloatsByEqualityOperator
             if (Width != pen.Width) return false;
-            
+
             //if one or the other is null then they are not equal, but not when they are both null
             if ((Color == null) ^ (pen.Color == null)) return false;
 
@@ -91,12 +90,12 @@ namespace Mapsui.Styles
             return Width.GetHashCode() ^ (Color == null ? 0 : Color.GetHashCode());
         }
 
-        public static bool operator ==(Pen pen1, Pen pen2)
+        public static bool operator ==(Pen? pen1, Pen? pen2)
         {
             return Equals(pen1, pen2);
         }
 
-        public static bool operator !=(Pen pen1, Pen pen2)
+        public static bool operator !=(Pen? pen1, Pen? pen2)
         {
             return !Equals(pen1, pen2);
         }

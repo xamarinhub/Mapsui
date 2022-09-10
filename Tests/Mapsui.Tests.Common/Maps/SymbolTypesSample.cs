@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using Mapsui.Geometries;
+using System.Diagnostics.CodeAnalysis;
 using Mapsui.Layers;
 using Mapsui.Providers;
 using Mapsui.Samples.Common;
@@ -8,7 +8,7 @@ using Mapsui.UI;
 
 namespace Mapsui.Tests.Common.Maps
 {
-    public class SymbolTypesSample : ISample
+    public class SymbolTypesSample : IMapControlSample
     {
         public string Name => "Symbol Types";
         public string Category => "Tests";
@@ -18,31 +18,37 @@ namespace Mapsui.Tests.Common.Maps
             mapControl.Map = CreateMap();
         }
 
+        [SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP001", MessageId = "Dispose created.")]
         public static Map CreateMap()
         {
+            var layer = CreateLayer();
+
             var map = new Map
             {
-                BackColor = Color.Transparent,
-                Home = n => n.NavigateTo(new Point(0, 0), 0.5)
+                BackColor = Color.FromString("WhiteSmoke"),
+                Home = n => n.NavigateTo(layer.Extent!.Grow(layer.Extent.Width * 2))
             };
 
-            map.Layers.Add(new MemoryLayer
-            {
-                DataSource = new MemoryProvider<IGeometryFeature>(CreateFeatures()),
-                Name = "Symbol Types",
-                Style = null
-            });
+            map.Layers.Add(layer);
 
             return map;
         }
 
-        private static IEnumerable<IGeometryFeature> CreateFeatures()
+        private static MemoryLayer CreateLayer()
         {
-            return new List<IGeometryFeature>()
+            return new MemoryLayer
             {
-                new Feature
-                {
-                    Geometry = new Point(-20, 0),
+                Features = CreateFeatures(),
+                Name = "Symbol Types",
+                Style = null
+            };
+        }
+
+        private static IEnumerable<IFeature> CreateFeatures()
+        {
+            return new List<IFeature>()
+            {
+                new PointFeature(new MPoint(0, 00)) {
                     Styles = new List<IStyle>
                     {
                         new SymbolStyle
@@ -53,9 +59,7 @@ namespace Mapsui.Tests.Common.Maps
                         }
                     }
                 },
-                new Feature
-                {
-                    Geometry = new Point(20, 0),
+                new PointFeature(new MPoint(50, 0)) {
                     Styles = new List<IStyle>
                     {
                         new SymbolStyle
@@ -66,9 +70,7 @@ namespace Mapsui.Tests.Common.Maps
                         }
                     }
                 },
-                new Feature
-                {
-                    Geometry = new Point(-20, 20),
+                new PointFeature(new MPoint(0, 50)) {
                     Styles = new List<IStyle>
                     {
                         new SymbolStyle

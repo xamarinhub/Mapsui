@@ -1,21 +1,41 @@
-﻿using Mapsui.Geometries;
-using Mapsui.Providers;
+﻿using System;
 using Mapsui.Styles;
-using Mapsui.UI.Forms.Extensions;
 using Mapsui.UI.Objects;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Mapsui.Nts;
+using NetTopologySuite.Geometries;
+using Mapsui.Nts.Extensions;
+
+#if __MAUI__
+using Microsoft.Maui;
+using Microsoft.Maui.Controls;
+using Mapsui.UI.Maui.Extensions;
+using Mapsui.UI.Maui.Utils;
+
+using Color = Microsoft.Maui.Graphics.Color;
+using KnownColor = Mapsui.UI.Maui.KnownColor;
+#else
+using Mapsui.UI.Forms.Extensions;
 using Xamarin.Forms;
 
+using Color = Xamarin.Forms.Color;
+using KnownColor = Xamarin.Forms.Color;
+#endif
+
+
+#if __MAUI__
+namespace Mapsui.UI.Maui
+#else
 namespace Mapsui.UI.Forms
+#endif
 {
     public class Polygon : Drawable
     {
-        public static readonly BindableProperty FillColorProperty = BindableProperty.Create(nameof(FillColor), typeof(Xamarin.Forms.Color), typeof(Polygon), Xamarin.Forms.Color.DarkGray);
-
+        public static readonly BindableProperty FillColorProperty = BindableProperty.Create(nameof(FillColor), typeof(Color), typeof(Polygon), KnownColor.DarkGray);
         private readonly ObservableRangeCollection<Position> _positions = new ObservableRangeCollection<Position>();
         private readonly ObservableRangeCollection<Position[]> _holes = new ObservableRangeCollection<Position[]>();
 
@@ -33,75 +53,76 @@ namespace Mapsui.UI.Forms
         /// <summary>
         ///  Color to fill circle with
         /// </summary>
-        public Xamarin.Forms.Color FillColor
+        public Color FillColor
         {
-            get { return (Xamarin.Forms.Color)GetValue(FillColorProperty); }
+            get { return (Color)GetValue(FillColorProperty); }
             set { SetValue(FillColorProperty, value); }
         }
 
         /// <summary>
         /// Outer contour of polygon
         /// </summary>
-        public IList<Position> Positions
-        {
-            get { return _positions; }
-        }
+        public IList<Position> Positions => _positions;
 
         /// <summary>
         /// Holes contained by polygon
         /// </summary>
-        public IList<Position[]> Holes
-        {
-            get { return _holes; }
-        }
+        public IList<Position[]> Holes => _holes;
 
-        protected override void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        private readonly object _sync = new object();
+
+        protected override void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             base.OnPropertyChanged(propertyName);
+
+            if (Feature == null)
+                return;
 
             switch (propertyName)
             {
                 case nameof(Positions):
-                    ((Mapsui.Geometries.Polygon)Feature.Geometry).ExteriorRing = new LinearRing(Positions.Select(p => p.ToMapsui()).ToList());
-                    break;
                 case nameof(Holes):
-                    ((Mapsui.Geometries.Polygon)Feature.Geometry).InteriorRings = Holes.Select(h => new LinearRing(h.Select(p => p.ToMapsui()).ToList())).ToList();
+                    // Treat changes to Positions and Holes the same way. In both scenarios we need to create everything from scratch.
+                    var shell = Positions.Select(p => p.ToCoordinate());
+                    var holes = Holes.Select(h => h.Select(p => p.ToCoordinate()));
+                    Feature.Geometry = shell.ToPolygon(holes);
                     break;
                 case nameof(FillColor):
                     ((VectorStyle)Feature.Styles.First()).Fill = new Styles.Brush(FillColor.ToMapsui());
                     break;
                 case nameof(StrokeColor):
-                    ((VectorStyle)Feature.Styles.First()).Outline.Color = StrokeColor.ToMapsui();
+                    var outline = ((VectorStyle)Feature.Styles.First()).Outline;
+                    if (outline != null)
+                        outline.Color = StrokeColor.ToMapsui();
                     break;
                 case nameof(StrokeWidth):
-                    ((VectorStyle)Feature.Styles.First()).Outline.Width = StrokeWidth;
+                    var pen = ((VectorStyle)Feature.Styles.First()).Outline;
+                    if (pen != null)
+                        pen.Width = StrokeWidth;
                     break;
             }
         }
 
-        void OnPositionsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        private void OnPositionsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             OnPropertyChanged(nameof(Positions));
         }
 
-        void OnHolesCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        private void OnHolesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             OnPropertyChanged(nameof(Holes));
         }
 
-        private object sync = new object();
-
         private void CreateFeature()
         {
-            lock (sync)
+            lock (_sync)
             {
                 if (Feature == null)
                 {
                     // Create a new one
-                    Feature = new Feature
+                    Feature = new GeometryFeature
                     {
-                        Geometry = new Mapsui.Geometries.Polygon(), 
-                        ["Label"] = Label,
+                        ["Label"] = Label
                     };
                     Feature.Styles.Clear();
                     Feature.Styles.Add(new VectorStyle

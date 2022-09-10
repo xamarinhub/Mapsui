@@ -1,104 +1,108 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using Mapsui.Geometries;
+using System.Threading.Tasks;
+using Mapsui.Layers;
 using Mapsui.Styles;
 using Mapsui.Styles.Thematics;
 
 namespace Mapsui.Providers
 {
-    public class StackedLabelProvider : IProvider<IFeature>
+    public class StackedLabelProvider : IProvider
     {
         private const int SymbolSize = 32; // todo: determine margin by symbol size
-        private const int BoxMargin = SymbolSize/2;
+        private const int BoxMargin = SymbolSize / 2;
 
-        private readonly IProvider<IGeometryFeature> _provider;
+        private readonly IProvider _provider;
         private readonly LabelStyle _labelStyle;
 
-        public StackedLabelProvider(IProvider<IGeometryFeature> provider, LabelStyle labelStyle, Pen rectangleLine = null,
-            Brush rectangleFill = null)
+        public StackedLabelProvider(IProvider provider, LabelStyle labelStyle, Pen? rectangleLine = null,
+            Brush? rectangleFill = null)
         {
             _provider = provider;
             _labelStyle = labelStyle;
             _rectangleLine = rectangleLine ?? new Pen(Color.Gray);
             _rectangleFill = rectangleFill;
         }
-        
-        public string CRS { get; set; }
 
-        private readonly Brush _rectangleFill;
+        public string? CRS { get; set; }
+
+        private readonly Brush? _rectangleFill;
 
         private readonly Pen _rectangleLine;
 
-        public IEnumerable<IFeature> GetFeaturesInView(BoundingBox box, double resolution)
+        public async Task<IEnumerable<IFeature>> GetFeaturesAsync(FetchInfo fetchInfo)
         {
-            var features = _provider.GetFeaturesInView(box, resolution);
-            return GetFeaturesInView(resolution, _labelStyle, features, _rectangleLine, _rectangleFill);
+            var features = await _provider.GetFeaturesAsync(fetchInfo);
+            return GetFeaturesInView(fetchInfo.Resolution, _labelStyle, features, _rectangleLine, _rectangleFill);
         }
 
-        public BoundingBox GetExtents()
+        public MRect? GetExtent()
         {
-            return _provider.GetExtents();
+            return _provider.GetExtent();
         }
 
-        private static List<Feature> GetFeaturesInView(double resolution, LabelStyle labelStyle,
-            IEnumerable<IGeometryFeature> features, Pen line, Brush fill)
+        private static IEnumerable<IFeature> GetFeaturesInView(double resolution, LabelStyle labelStyle,
+            IEnumerable<IFeature>? features, Pen line, Brush? fill)
         {
+            if (features == null)
+                return Enumerable.Empty<IFeature>();
+
             var margin = resolution * 50;
-            var clusters = new List<Cluster>();
-            // todo: repeat until there are no more merges
-            ClusterFeatures(clusters, features, margin, labelStyle, resolution);
+            var clusters = ClusterFeatures(features, margin, labelStyle, resolution);
 
             const int textHeight = 18;
 
-            var results = new List<Feature>();
+            var result = new List<IFeature>();
 
             foreach (var cluster in clusters)
             {
-                if (cluster.Features.Count > 1) results.Add(CreateBoxFeature(resolution, cluster, line, fill));
+                if (cluster.Features?.Count > 1)
+                {
+                    result.Add(CreateBoxFeature(resolution, cluster, line, fill));
+                }
 
                 var offsetY = double.NaN;
 
-                var orderedFeatures = cluster.Features.OrderBy(f => f.Geometry.BoundingBox.Centroid.Y);
+                var orderedFeatures = cluster.Features?.OrderBy(f => f.Extent.Centroid.Y);
 
-                foreach (var pointFeature in orderedFeatures)
+                if (orderedFeatures != null)
                 {
-                    var position = CalculatePosition(cluster);
+                    foreach (var pointFeature in orderedFeatures)
+                    {
+                        var position = CalculatePosition(cluster);
 
-                    offsetY = CalculateOffsetY(offsetY, textHeight);
+                        offsetY = CalculateOffsetY(offsetY, textHeight);
 
-                    var labelText = labelStyle.GetLabelText(pointFeature);
-                    var labelFeature = CreateLabelFeature(position, labelStyle, offsetY, labelText);
+                        var labelText = labelStyle.GetLabelText(pointFeature);
+                        var labelFeature = CreateLabelFeature(position, labelStyle, offsetY, labelText);
 
-                    results.Add(labelFeature);
+                        result.Add(labelFeature);
+                    }
                 }
             }
-            return results;
+            return result;
         }
 
         private static double CalculateOffsetY(double offsetY, int textHeight)
         {
             if (double.IsNaN(offsetY)) // first time
-                offsetY = textHeight*0.5 + BoxMargin;
+                offsetY = textHeight * 0.5 + BoxMargin;
             else
                 offsetY += textHeight; // todo: get size from text (or just pass stack nr)
             return offsetY;
         }
 
-        private static Point CalculatePosition(Cluster cluster)
+        private static MPoint CalculatePosition(Cluster cluster)
         {
-            // Since the box can be rotated, find the minimal Y value of all 4 corners
-            var rotatedBox = cluster.Box.Rotate(0); // todo: Add rotation '-viewport.Rotation'
-            var minY = rotatedBox.Vertices.Select(v => v.Y).Min();
-            var position = new Point(cluster.Box.Centroid.X, minY);
-            return position;
+            var minY = cluster.Box.Vertices.Select(v => v.Y).Min();
+            return new MPoint(cluster.Box.Centroid.X, minY);
         }
 
-        private static Feature CreateLabelFeature(Point position, LabelStyle labelStyle, double offsetY,
-            string text)
+        private static IFeature CreateLabelFeature(MPoint position, LabelStyle labelStyle, double offsetY,
+            string? text)
         {
-            return new Feature
+            return new PointFeature(position)
             {
-                Geometry = position,
                 Styles = new[]
                 {
                     new LabelStyle(labelStyle)
@@ -110,12 +114,11 @@ namespace Mapsui.Providers
             };
         }
 
-        private static Feature CreateBoxFeature(double resolution, Cluster cluster, Pen line, 
-            Brush fill)
+        private static IFeature CreateBoxFeature(double resolution, Cluster cluster, Pen line,
+            Brush? fill)
         {
-            return new Feature
+            return new RectFeature(GrowBox(cluster.Box, resolution))
             {
-                Geometry = ToPolygon(GrowBox(cluster.Box, resolution)),
                 Styles = new[]
                 {
                     new VectorStyle
@@ -127,35 +130,25 @@ namespace Mapsui.Providers
             };
         }
 
-        private static Polygon ToPolygon(BoundingBox box)
-        {
-            return new Polygon
-            {
-                ExteriorRing = new LinearRing(new[]
-                {
-                    box.BottomLeft, box.TopLeft, box.TopRight, box.BottomRight, box.BottomLeft
-                })
-            };
-        }
-
-        private static BoundingBox GrowBox(BoundingBox box, double resolution)
+        private static MRect GrowBox(MRect box, double resolution)
         {
             const int symbolSize = 32; // todo: determine margin by symbol size
-            const int boxMargin = symbolSize/2;
-            return box.Grow(boxMargin*resolution);
+            const int boxMargin = symbolSize / 2;
+            return box.Grow(boxMargin * resolution);
         }
 
-        private static void ClusterFeatures(
-            ICollection<Cluster> clusters,
-            IEnumerable<IGeometryFeature> features,
+        private static IEnumerable<Cluster> ClusterFeatures(
+            IEnumerable<IFeature> features,
             double minDistance,
             IStyle layerStyle,
             double resolution)
         {
+            var clusters = new List<Cluster>();
+
             var style = layerStyle;
 
             // todo: This method should repeated several times until there are no more merges
-            foreach (var feature in features.OrderBy(f => f.Geometry.BoundingBox.Centroid.Y))
+            foreach (var feature in features.OrderBy(f => f.Extent?.Centroid.Y))
             {
                 if (layerStyle is IThemeStyle themeStyle)
                     style = themeStyle.GetStyle(feature);
@@ -167,28 +160,32 @@ namespace Mapsui.Providers
 
                 var found = false;
                 foreach (var cluster in clusters)
-                    if (cluster.Box.Grow(minDistance).Contains(feature.Geometry.BoundingBox.Centroid))
+                    if (cluster.Box?.Grow(minDistance).Contains(feature.Extent?.Centroid) ?? false)
                     {
-                        cluster.Features.Add(feature);
-                        cluster.Box = cluster.Box.Join(feature.Geometry.BoundingBox);
+                        cluster.Features?.Add(feature);
+                        cluster.Box = cluster.Box.Join(feature.Extent);
                         found = true;
                         break;
                     }
 
                 if (found) continue;
 
-                clusters.Add(new Cluster
-                {
-                    Box = feature.Geometry.BoundingBox.Clone(),
-                    Features = new List<IGeometryFeature> {feature}
-                });
+                if (feature.Extent != null)
+                    clusters.Add(new Cluster(feature.Extent.Copy(), new List<IFeature> { feature }));
             }
+
+            return clusters;
         }
 
         private class Cluster
         {
-            public BoundingBox Box { get; set; }
-            public IList<IGeometryFeature> Features { get; set; }
+            public Cluster(MRect box, IList<IFeature> features)
+            {
+                Box = box;
+                Features = features;
+            }
+            public MRect Box { get; set; }
+            public IList<IFeature> Features { get; }
         }
     }
 }

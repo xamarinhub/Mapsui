@@ -13,6 +13,7 @@ using Mapsui.Samples.Wpf.Utilities;
 using Mapsui.UI;
 using Mapsui.Samples.Common;
 using Mapsui.Samples.Common.Desktop;
+using Mapsui.Samples.Common.Extensions;
 
 namespace Mapsui.Samples.Wpf
 {
@@ -26,7 +27,7 @@ namespace Mapsui.Samples.Wpf
 
             MapControl.FeatureInfo += MapControlFeatureInfo;
             MapControl.MouseMove += MapControlOnMouseMove;
-            MapControl.Map.RotationLock = false;
+            MapControl.Map!.RotationLock = false;
             MapControl.UnSnapRotationDegrees = 30;
             MapControl.ReSnapRotationDegrees = 5;
             MapControl.Renderer.WidgetRenders[typeof(CustomWidget.CustomWidget)] = new CustomWidgetSkiaRenderer();
@@ -34,12 +35,10 @@ namespace Mapsui.Samples.Wpf
             Logger.LogDelegate += LogMethod;
 
             CategoryComboBox.SelectionChanged += CategoryComboBoxSelectionChanged;
-            
+
             FillComboBoxWithCategories();
             FillListWithSamples();
         }
-        
-
 
         private void MapControlOnMouseMove(object sender, MouseEventArgs e)
         {
@@ -64,7 +63,7 @@ namespace Mapsui.Samples.Wpf
         {
             FillListWithSamples();
         }
-        
+
         private void FillComboBoxWithCategories()
         {
             // todo: find proper way to load assembly
@@ -77,10 +76,10 @@ namespace Mapsui.Samples.Wpf
                 CategoryComboBox.Items.Add(category);
             }
 
-            CategoryComboBox.SelectedIndex = 1;
+            CategoryComboBox.SelectedIndex = 0;
         }
 
-        private UIElement CreateRadioButton(ISample sample)
+        private UIElement CreateRadioButton(ISampleBase sample)
         {
             var radioButton = new RadioButton
             {
@@ -89,24 +88,27 @@ namespace Mapsui.Samples.Wpf
                 Margin = new Thickness(4)
             };
 
-            radioButton.Click += (s, a) =>
-            {
-                MapControl.Map.Layers.Clear();
+            radioButton.Click += (s, a) => {
+                Catch.Exceptions(async () =>
+                {
+                    MapControl.Map?.Layers.Clear();
 
-                sample.Setup(MapControl);
+                    await sample.SetupAsync(MapControl);
 
-                MapControl.Info += MapControlOnInfo;
-                LayerList.Initialize(MapControl.Map.Layers);
+                    MapControl.Info += MapControlOnInfo;
+                    if (MapControl.Map != null)
+                        LayerList.Initialize(MapControl.Map.Layers);
+                });
             };
             return radioButton;
         }
 
         readonly LimitedQueue<LogModel> _logMessage = new LimitedQueue<LogModel>(6);
 
-        private void LogMethod(LogLevel logLevel, string message, Exception exception)
+        private void LogMethod(LogLevel logLevel, string? message, Exception? exception)
         {
             _logMessage.Enqueue(new LogModel { Exception = exception, LogLevel = logLevel, Message = message });
-            Dispatcher.Invoke(() => LogTextBox.Text = ToMultiLineString(_logMessage));
+            Dispatcher.BeginInvoke(() => LogTextBox.Text = ToMultiLineString(_logMessage));
         }
 
         private string ToMultiLineString(LimitedQueue<LogModel> logMessages)
@@ -123,19 +125,19 @@ namespace Mapsui.Samples.Wpf
             return result.ToString();
         }
 
-        private static void MapControlFeatureInfo(object sender, FeatureInfoEventArgs e)
+        private static void MapControlFeatureInfo(object? sender, FeatureInfoEventArgs e)
         {
-            MessageBox.Show(e.FeatureInfo.ToDisplayText());
+            MessageBox.Show(e.FeatureInfo?.ToDisplayText());
         }
-        
+
         private void RotationSliderChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             var percent = RotationSlider.Value / (RotationSlider.Maximum - RotationSlider.Minimum);
-            MapControl.Navigator.RotateTo(percent * 360);
+            MapControl.Navigator?.RotateTo(percent * 360);
             MapControl.Refresh();
         }
 
-        private void MapControlOnInfo(object sender, MapInfoEventArgs args)
+        private void MapControlOnInfo(object? sender, MapInfoEventArgs args)
         {
             if (args.MapInfo?.Feature != null)
             {

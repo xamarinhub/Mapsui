@@ -1,22 +1,10 @@
-// Copyright 2005, 2006 - Morten Nielsen (www.iter.dk)
-//
-// This file is part of SharpMap.
-// Mapsui is free software; you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
-// (at your option) any later version.
-// 
-// SharpMap is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Lesser General Public License for more details.
+// Copyright (c) The Mapsui authors.
+// The Mapsui authors licensed this file under the MIT license.
+// See the LICENSE file in the project root for full license information.
 
-// You should have received a copy of the GNU Lesser General Public License
-// along with SharpMap; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
+// This file was originally created by Morten Nielsen (www.iter.dk) as part of SharpMap
 
 using System;
-using Mapsui.Providers;
 
 namespace Mapsui.Styles
 {
@@ -103,6 +91,9 @@ namespace Mapsui.Styles
             MaxWidth = 0;
             LineHeight = 1.0;
             WordWrap = LineBreakMode.NoWrap;
+            BorderColor = Color.Transparent;
+            BorderThickness = 1.0;
+            CornerRounding = 6;
         }
 
         public LabelStyle(LabelStyle labelStyle)
@@ -111,7 +102,7 @@ namespace Mapsui.Styles
             Offset = new Offset(labelStyle.Offset);
             CollisionDetection = false;
             ForeColor = new Color(labelStyle.ForeColor);
-            BackColor = new Brush(labelStyle.BackColor);
+            BackColor = (labelStyle.BackColor == null) ? null : new Brush(labelStyle.BackColor);
             HorizontalAlignment = HorizontalAlignmentEnum.Center;
             VerticalAlignment = VerticalAlignmentEnum.Center;
             MaxWidth = labelStyle.MaxWidth;
@@ -120,6 +111,10 @@ namespace Mapsui.Styles
             Text = labelStyle.Text;
             LabelColumn = labelStyle.LabelColumn;
             LabelMethod = labelStyle.LabelMethod;
+            Halo = labelStyle.Halo;
+            BorderColor = labelStyle.BorderColor;
+            BorderThickness = labelStyle.BorderThickness;
+            CornerRounding = labelStyle.CornerRounding;
         }
 
         /// <summary>
@@ -135,12 +130,27 @@ namespace Mapsui.Styles
         /// <summary>
         /// The background color of the label. Set to transparent brush or null if background isn't needed
         /// </summary>
-        public Brush BackColor { get; set; } // todo: rename
+        public Brush? BackColor { get; set; } // todo: rename
+
+        /// <summary>
+        /// The color of the border around the background.
+        /// </summary>
+        public Color BorderColor { get; set; }
+
+        /// <summary>
+        /// The thickness of the border around the background.
+        /// </summary>
+        public double BorderThickness { get; set; }
+
+        /// <summary>
+        /// The radius of the oval used to round the corners of the background. See <see cref="SkiaSharp.SkCanvas.DrawRoundRect"/>.
+        /// </summary>
+        public int CornerRounding { get; set; }
 
         /// <summary>
         /// Creates a halo around the text
         /// </summary>
-        public Pen Halo { get; set; }
+        public Pen? Halo { get; set; }
 
         /// <summary>
         /// Specifies relative position of labels with respect to objects label point
@@ -181,21 +191,21 @@ namespace Mapsui.Styles
 
         /// <summary>The text used for this specific label.</summary>
         /// <remarks>Used only when LabelColumn and LabelMethod are not set.</remarks>
-        public string Text { private get; set; }
+        public string? Text { private get; set; }
 
         /// <summary>The column of the feature used by GetLabelText to return the label text.</summary>
         /// <remarks>Used only when LabelMethod is not set. Overrides use of the Text field.</remarks>
-        public string LabelColumn { get; set; }
+        public string? LabelColumn { get; set; }
 
         /// <summary>Method used by GetLabelText to return the label text.</summary>
         /// <remarks>Overrides use of Text and LabelColumn fields.</remarks>
-        public Func<IFeature, string> LabelMethod { get; set; }
+        public Func<IFeature, string?>? LabelMethod { get; set; }
 
         /// <summary>The text used for this specific label.</summary>
-        public string GetLabelText(IFeature feature)
+        public string? GetLabelText(IFeature feature)
         {
             if (LabelMethod != null) return LabelMethod(feature);
-            if (LabelColumn != null) return feature[LabelColumn].ToString();
+            if (LabelColumn != null) return feature[LabelColumn]?.ToString();
             return Text;
         }
 

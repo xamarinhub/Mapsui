@@ -1,9 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(SolutionName)' != 'Mapsui.Mac.Legacy'">$(TargetFrameworks);net6.0</TargetFrameworks>
     <Authors>Mapsui Contributers</Authors>
-    <RuntimeIdentifiers>win10-x86;win10-x64;win10-arm64</RuntimeIdentifiers>
   </PropertyGroup>
+
   <ItemGroup>
     <None Remove="EmbeddedResources\cities.geojson" />
     <None Remove="EmbeddedResources\cities.json" />
@@ -13,6 +15,7 @@
     <None Remove="EmbeddedResources\torrejon-de-ardoz.mbtiles" />
     <None Remove="EmbeddedResources\world.mbtiles" />
     <None Remove="Images\arrow.png" />
+    <None Remove="Images\arrow.svg" />
     <None Remove="Images\Ghostscript_Tiger.png" />
     <None Remove="Images\Ghostscript_Tiger.svg" />
     <None Remove="Images\home.png" />
@@ -26,6 +29,7 @@
     <None Remove="MbTiles\torrejon-de-ardoz.mbtiles" />
     <None Remove="MbTiles\world.mbtiles" />
   </ItemGroup>
+
   <ItemGroup>
     <EmbeddedResource Include="EmbeddedResources\cities.geojson" />
     <EmbeddedResource Include="EmbeddedResources\cities.json" />
@@ -39,6 +43,7 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </EmbeddedResource>
     <EmbeddedResource Include="Images\arrow.png" />
+    <EmbeddedResource Include="Images\arrow.svg" />
     <EmbeddedResource Include="Images\Ghostscript_Tiger.png" />
     <EmbeddedResource Include="Images\Ghostscript_Tiger.svg" />
     <EmbeddedResource Include="Images\home.png" />
@@ -60,13 +65,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="BruTile" Version="4.0.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
-    <PackageReference Include="BruTile.MbTiles" Version="4.0.0" />
+    <PackageReference Include="BruTile" />
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="BruTile.MbTiles" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Mapsui.Geometries\Mapsui.Geometries.csproj" />
+    <ProjectReference Include="..\..\Mapsui.Extensions\Mapsui.Extensions.csproj" />
+    <ProjectReference Include="..\..\Mapsui.Tiling\Mapsui.Tiling.csproj" />
     <ProjectReference Include="..\..\Mapsui\Mapsui.csproj" />
     <ProjectReference Include="..\Mapsui.Samples.CustomWidget\Mapsui.Samples.CustomWidget.csproj" />
   </ItemGroup>

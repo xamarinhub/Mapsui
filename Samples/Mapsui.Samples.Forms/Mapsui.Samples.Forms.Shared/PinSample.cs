@@ -15,16 +15,19 @@ namespace Mapsui.Samples.Forms.Shared
     public class PinSample : IFormsSample
     {
         int _markerNum = 1;
-        readonly Random _random = new Random();
+        readonly Random _random = new Random(4);
 
         public string Name => "Add Pin Sample";
 
         public string Category => "Forms";
 
-        public bool OnClick(object sender, EventArgs args)
+        public bool OnClick(object? sender, EventArgs args)
         {
-            var mapView = (MapView)sender;
+            var mapView = sender as MapView;
             var mapClickedArgs = (MapClickedEventArgs)args;
+
+            if (mapView == null)
+                return false;
 
             var assembly = typeof(AllSamples).GetTypeInfo().Assembly;
             foreach (var str in assembly.GetManifestResourceNames())
@@ -73,17 +76,20 @@ namespace Mapsui.Samples.Forms.Shared
                         pin.Callout.Type = CalloutType.Detail;
                         pin.Callout.Content = 1;
                     }
-                    pin.Callout.CalloutClicked += (s, e) =>
-                    {
+                    pin.Callout.CalloutClicked += (s, e) => {
                         if (e.NumOfTaps == 2)
                         {
                             // Double click on callout moves pin
-                            var p = e.Callout.Pin;
-                            p.Position = new Position(p.Position.Latitude + 0.01, p.Position.Longitude);
-                            e.Handled = true;
+                            var p = e.Callout?.Pin;
+                            if (p != null)
+                            {
+                                p.Position = new Position(p.Position.Latitude + 0.01, p.Position.Longitude);
+                                e.Handled = true;
+                            }
+
                             return;
                         }
-                        if (e.Callout.Title != "You clicked me!")
+                        if (e.Callout != null && e.Callout.Title != "You clicked me!")
                         {
                             e.Callout.Type = CalloutType.Single;
                             e.Callout.Title = "You clicked me!";
@@ -97,28 +103,34 @@ namespace Mapsui.Samples.Forms.Shared
                     var resourceName = "Mapsui.Samples.Common.Images.Ghostscript_Tiger.svg";
                     var stream = assembly.GetManifestResourceStream(resourceName);
                     if (stream == null) throw new Exception($"Could not find EmbeddedResource {resourceName}");
-                    var reader = new StreamReader(stream);
-                    string svgString = reader.ReadToEnd();
-                    mapView.Pins.Add(new Pin(mapView)
+                    using (var reader = new StreamReader(stream))
                     {
-                        Label = $"PinType.Svg {_markerNum++}",
-                        Position = mapClickedArgs.Point,
-                        Type = PinType.Svg,
-                        Scale = 0.1f,
-                        RotateWithMap = true,
-                        Svg = svgString
-                    });
+                        string svgString = reader.ReadToEnd();
+                        mapView.Pins.Add(new Pin(mapView)
+                        {
+                            Label = $"PinType.Svg {_markerNum++}",
+                            Position = mapClickedArgs.Point,
+                            Type = PinType.Svg,
+                            Scale = 0.1f,
+                            RotateWithMap = true,
+                            Svg = svgString
+                        });
+                    }
+
                     break;
                 case 3:
-                    var icon = assembly.GetManifestResourceStream("Mapsui.Samples.Common.Images.loc.png").ToBytes();
-                    mapView.Pins.Add(new Pin(mapView)
+                    using (var manifestResourceStream = assembly.GetManifestResourceStream("Mapsui.Samples.Common.Images.loc.png"))
                     {
-                        Label = $"PinType.Icon {_markerNum++}",
-                        Position = mapClickedArgs.Point,
-                        Type = PinType.Icon,
-                        Scale = 0.5f,
-                        Icon = icon
-                    });
+                        var icon = manifestResourceStream!.ToBytes();
+                        mapView.Pins.Add(new Pin(mapView)
+                        {
+                            Label = $"PinType.Icon {_markerNum++}",
+                            Position = mapClickedArgs.Point,
+                            Type = PinType.Icon,
+                            Scale = 0.5f,
+                            Icon = icon
+                        });
+                    }
                     break;
             }
 
@@ -131,7 +143,7 @@ namespace Mapsui.Samples.Forms.Shared
             //mapControl.Map = OsmSample.CreateMap();
 
             //I like bing Hybrid
-            mapControl.Map = BingSample.CreateMap(BruTile.Predefined.KnownTileSource.BingHybrid);
+            mapControl.Map = BingSample.CreateMap(BingHybrid.DefaultCache, BruTile.Predefined.KnownTileSource.BingHybrid);
 
             ((MapView)mapControl).UseDoubleTap = true;
             //((MapView)mapControl).UniqueCallout = true;

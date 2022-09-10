@@ -1,3 +1,5 @@
+using Mapsui.Extensions;
+using Mapsui.Logging;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -9,17 +11,17 @@ using System.Threading.Tasks;
 
 namespace Mapsui.Providers.Wms
 {
-    public delegate void StatusEventHandler(object sender, FeatureInfo featureInfo);
+    public delegate void StatusEventHandler(object sender, FeatureInfo? featureInfo);
 
     public class GetFeatureInfo
     {
-        private string _infoFormat;
-        private string _layerName;
-        public event StatusEventHandler IdentifyFinished;
-        public event StatusEventHandler IdentifyFailed;
+        private string? _infoFormat;
+        private string? _layerName;
+        public event StatusEventHandler? IdentifyFinished;
+        public event StatusEventHandler? IdentifyFailed;
         private readonly Func<string, Task<Stream>> _getStreamAsync;
 
-        public GetFeatureInfo(Func<string, Task<Stream>> getStreamAsync = null)
+        public GetFeatureInfo(Func<string, Task<Stream>>? getStreamAsync = null)
         {
             TimeOut = 7000;
             _getStreamAsync = getStreamAsync ?? GetStreamAsync;
@@ -30,12 +32,12 @@ namespace Mapsui.Providers.Wms
         /// </summary>
         public int TimeOut { get; set; }
 
-        public Dictionary<string, string> ExtraParams { get; set; }
+        public Dictionary<string, string>? ExtraParams { get; set; }
 
         /// <summary>
         /// Provides the base authentication interface for retrieving credentials for Web client authentication.
         /// </summary>
-        public ICredentials Credentials { get; set; }
+        public ICredentials? Credentials { get; set; }
 
         /// <summary>
         /// Request FeatureInfo for a WMS Server
@@ -58,9 +60,8 @@ namespace Mapsui.Providers.Wms
             _infoFormat = infoFormat;
             var requestUrl = CreateRequestUrl(baseUrl, wmsVersion, infoFormat, srs, layer, extendXmin, extendYmin, extendXmax, extendYmax, x, y, mapWidth, mapHeight);
 
-            var thread = new Thread(delegate()
-            {
-                using var task = _getStreamAsync(requestUrl);
+            Catch.TaskRun(async () => {
+                using var task = await _getStreamAsync(requestUrl);
                 try
                 {
                     var parser = GetParserFromFormat(_infoFormat);
@@ -71,17 +72,15 @@ namespace Mapsui.Providers.Wms
                         return;
                     }
 
-                    var featureInfo = parser.ParseWMSResult(_layerName, task.Result);
-                    task.Result.Close();
+                    var featureInfo = parser.ParseWMSResult(_layerName, task);
                     OnIdentifyFinished(featureInfo);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
+                    Logger.Log(LogLevel.Error, ex.Message, ex);
                     OnIdentifyFailed();
                 }
             });
-
-            thread.Start();
         }
 
         private async Task<Stream> GetStreamAsync(string url)
@@ -158,7 +157,7 @@ namespace Mapsui.Providers.Wms
         /// Get a parser that is able to parse the output returned from the service
         /// </summary>
         /// <param name="format">Output format of the service</param>
-        private static IGetFeatureInfoParser GetParserFromFormat(string format)
+        private static IGetFeatureInfoParser? GetParserFromFormat(string format)
         {
             if (format.Equals("application/vnd.ogc.gml"))
                 return new GmlGetFeatureInfoParser();

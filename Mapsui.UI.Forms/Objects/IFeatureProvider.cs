@@ -1,9 +1,9 @@
-﻿using Mapsui.Providers;
+﻿using Mapsui.Nts;
 
 namespace Mapsui.UI.Objects
 {
     public interface IFeatureProvider
     {
-        IGeometryFeature Feature { get; }
+        GeometryFeature? Feature { get; }
     }
 }

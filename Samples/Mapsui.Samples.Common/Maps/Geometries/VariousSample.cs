@@ -1,81 +1,70 @@
 ﻿using System.Collections.Generic;
-using System.Reflection;
-using Mapsui.Geometries;
+using System.Linq;
+using System.Threading.Tasks;
+using Mapsui.Extensions;
 using Mapsui.Layers;
 using Mapsui.Providers;
 using Mapsui.Samples.Common.Helpers;
 using Mapsui.Styles;
+using Mapsui.Tiling;
 using Mapsui.UI;
-using Mapsui.Utilities;
+
 
 namespace Mapsui.Samples.Common.Maps
 {
-    public class VariousSample : ISample
+    public class VariousSample : ISample, ISampleTest
     {
         public string Name => "5 Various geometries";
         public string Category => "Geometries";
 
-        public void Setup(IMapControl mapControl)
-        {
-            mapControl.Map = CreateMap();
-        }
-
-        public static Map CreateMap()
+        public Task<Map> CreateMapAsync()
         {
             var map = new Map();
 
             map.Layers.Add(OpenStreetMap.CreateTileLayer());
             map.Layers.Add(PolygonSample.CreateLayer());
             map.Layers.Add(LineStringSample.CreateLineStringLayer(LineStringSample.CreateLineStringStyle()));
-            map.Layers.Add(CreateLayerWithStyleOnLayer(map.Envelope, 10));
-            map.Layers.Add(CreateLayerWithStyleOnFeature(map.Envelope, 10));
+            map.Layers.Add(CreateLayerWithStyleOnLayer(map.Extent, 10));
+            map.Layers.Add(CreateLayerWithStyleOnFeature(map.Extent, 10));
 
-            return map;
+            return Task.FromResult(map);
         }
 
-        private static ILayer CreateLayerWithStyleOnLayer(BoundingBox envelope, int count = 25)
+        private static ILayer CreateLayerWithStyleOnLayer(MRect? envelope, int count = 25)
         {
             return new Layer("Style on Layer")
             {
-                DataSource = new MemoryProvider<IGeometryFeature>(RandomPointHelper.GenerateRandomPoints(envelope, count)),
-                Style = CreateBitmapStyle("Mapsui.Samples.Common.Images.ic_place_black_24dp.png")
+                DataSource = new MemoryProvider(RandomPointGenerator.GenerateRandomPoints(envelope, count).ToFeatures()),
+                Style = CreateBitmapStyle("Images.ic_place_black_24dp.png")
             };
         }
 
-        private static ILayer CreateLayerWithStyleOnFeature(BoundingBox envelope, int count = 25)
+        private static ILayer CreateLayerWithStyleOnFeature(MRect? envelope, int count = 25)
         {
-            var style = CreateBitmapStyle("Mapsui.Samples.Common.Images.loc.png");
+            var style = CreateBitmapStyle("Images.loc.png");
 
             return new Layer("Style on feature")
             {
-                DataSource = new MemoryProvider<IGeometryFeature>(GenerateRandomFeatures(envelope, count, style)),
+                DataSource = new MemoryProvider(GenerateRandomFeatures(envelope, count, style)),
                 Style = null
             };
         }
 
-        private static IEnumerable<IGeometryFeature> GenerateRandomFeatures(BoundingBox envelope, int count, IStyle style)
+        private static IEnumerable<IFeature> GenerateRandomFeatures(MRect? envelope, int count, IStyle style)
         {
-            var result = new List<Feature>();
-            var points = RandomPointHelper.GenerateRandomPoints(envelope, count, 123);
-            foreach (var point in points)
-            {
-                result.Add(new Feature { Geometry = point, Styles = new List<IStyle> { style } });
-            }
-            return result;
+            return RandomPointGenerator.GenerateRandomPoints(envelope, count, new System.Random(123))
+                .Select(p => new PointFeature(p) { Styles = new List<IStyle> { style } }).ToList();
         }
 
         private static SymbolStyle CreateBitmapStyle(string embeddedResourcePath)
         {
-            var bitmapId = GetBitmapIdForEmbeddedResource(embeddedResourcePath);
+            var bitmapId = typeof(VariousSample).LoadBitmapId(embeddedResourcePath);
             return new SymbolStyle { BitmapId = bitmapId, SymbolScale = 0.75 };
         }
 
-        private static int GetBitmapIdForEmbeddedResource(string imagePath)
+        public async Task InitializeTestAsync()
         {
-            var assembly = typeof(PointsSample).GetTypeInfo().Assembly;
-            var image = assembly.GetManifestResourceStream(imagePath);
-            var bitmapId = BitmapRegistry.Instance.Register(image);
-            return bitmapId;
+            await Task.Delay(1000);
         }
     }
 }

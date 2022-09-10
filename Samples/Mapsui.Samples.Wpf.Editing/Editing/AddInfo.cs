@@ -1,13 +1,13 @@
 ﻿using System.Collections.Generic;
-using Mapsui.Geometries;
-using Mapsui.Providers;
+using Mapsui.Nts;
+using NetTopologySuite.Geometries;
 
 namespace Mapsui.Samples.Wpf.Editing.Editing
 {
     public class AddInfo
     {
-        public IGeometryFeature Feature;
-        public IList<Point> Vertices;
-        public Point Vertex;
+        public GeometryFeature? Feature;
+        public IList<Coordinate>? Vertices;
+        public Coordinate? Vertex;
     }
 }

@@ -1,8 +1,12 @@
-﻿using BruTile.Predefined;
+﻿using System.IO;
+using System.Threading.Tasks;
+using BruTile.Cache;
+using BruTile.Predefined;
 using Mapsui.Fetcher;
-using Mapsui.Geometries;
 using Mapsui.Layers;
 using Mapsui.Styles;
+using Mapsui.Tiling.Fetcher;
+using Mapsui.Tiling.Layers;
 using Mapsui.UI;
 
 namespace Mapsui.Samples.Common.Maps
@@ -11,22 +15,22 @@ namespace Mapsui.Samples.Common.Maps
     {
         public string Name => "3 Virtual Earth";
         public string Category => "Demo";
-        public void Setup(IMapControl mapControl)
+        public Task<Map> CreateMapAsync()
         {
-            mapControl.Map = CreateMap();
+            return Task.FromResult(CreateMap(BingArial.DefaultCache));
         }
 
-        public static Map CreateMap(KnownTileSource source = KnownTileSource.BingAerial)
+        public static Map CreateMap(IPersistentCache<byte[]>? persistentCache, KnownTileSource source = KnownTileSource.BingAerial)
         {
             var map = new Map();
 
             var apiKey = "Enter your api key here"; // Contact Microsoft about how to use this
-            map.Layers.Add(new TileLayer(KnownTileSources.Create(source, apiKey), 
+            map.Layers.Add(new TileLayer(KnownTileSources.Create(source, apiKey, persistentCache),
                 dataFetchStrategy: new DataFetchStrategy()) // DataFetchStrategy prefetches tiles from higher levels
             {
                 Name = "Bing Aerial",
             });
-            map.Home = n => n.NavigateTo(new Point(1059114.80157058, 5179580.75916194), map.Resolutions[14]);
+            map.Home = n => n.NavigateTo(new MPoint(1059114.80157058, 5179580.75916194), map.Resolutions[14]);
             map.BackColor = Color.FromString("#000613");
 
             return map;

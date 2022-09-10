@@ -22,12 +22,12 @@ namespace Mapsui.Styles
             FillStyle = brush.FillStyle;
         }
 
-        public Color Color { get; set; }
+        public Color? Color { get; set; }
 
         // todo: 
         // Perhaps rename to something like SecondaryColor. The 'Color' 
         // field is itself a background in many cases. This is confusing
-        public Color Background { get; set; } 
+        public Color? Background { get; set; }
 
         /// <summary>
         /// This identifies bitmap in the BitmapRegistry
@@ -38,7 +38,7 @@ namespace Mapsui.Styles
             set
             {
                 _bitmapId = value;
-                if(_bitmapId != -1 && !(FillStyle == FillStyle.Bitmap || FillStyle == FillStyle.BitmapRotated))
+                if (_bitmapId != -1 && !(FillStyle == FillStyle.Bitmap || FillStyle == FillStyle.BitmapRotated))
                     FillStyle = FillStyle.Bitmap;
             }
         }
@@ -48,7 +48,7 @@ namespace Mapsui.Styles
         /// </summary>
         public FillStyle FillStyle { get; set; } = FillStyle.Solid;
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (!(obj is Brush brush))
             {
@@ -57,9 +57,12 @@ namespace Mapsui.Styles
             return Equals(brush);
         }
 
-        public bool Equals(Brush brush)
+        public bool Equals(Brush? brush)
         {
-            if ((Color == null) ^ (brush.Color == null))
+            if (brush is null)
+                return false;
+
+            if ((Color is null) ^ (brush.Color is null))
             {
                 return false;
             }
@@ -72,16 +75,16 @@ namespace Mapsui.Styles
         }
 
         public override int GetHashCode()
-        {            
-            return Color == null ? 0 : Color.GetHashCode();
+        {
+            return Color is null ? 0 : Color.GetHashCode();
         }
 
-        public static bool operator ==(Brush brush1, Brush brush2)
+        public static bool operator ==(Brush? brush1, Brush? brush2)
         {
             return Equals(brush1, brush2);
         }
 
-        public static bool operator !=(Brush brush1, Brush brush2)
+        public static bool operator !=(Brush? brush1, Brush? brush2)
         {
             return !Equals(brush1, brush2);
         }

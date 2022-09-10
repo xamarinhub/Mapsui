@@ -1,6 +1,4 @@
-﻿using Mapsui.Geometries;
-
-namespace Mapsui.Widgets
+﻿namespace Mapsui.Widgets
 {
     public interface IWidget
     {
@@ -12,7 +10,7 @@ namespace Mapsui.Widgets
         /// <summary>
         /// The hit box of the widget. This needs to be updated from the widget renderer.
         /// </summary>
-        BoundingBox Envelope { get; set; }
+        MRect? Envelope { get; set; }
 
         /// <summary>
         /// Function, which is called, when a Widget is hidden
@@ -20,7 +18,7 @@ namespace Mapsui.Widgets
         /// <param name="navigator">Navigator of MapControl</param>
         /// <param name="position">Screen position</param>
         /// <returns>True, if the Widget had handled the touch event</returns>
-        bool HandleWidgetTouched(INavigator navigator, Point position);
+        bool HandleWidgetTouched(INavigator navigator, MPoint position);
 
         bool Enabled { get; set; }
     }

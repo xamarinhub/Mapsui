@@ -9,13 +9,13 @@ namespace Mapsui.Providers.Wms
 {
     public class GmlGetFeatureInfoParser : IGetFeatureInfoParser
     {
-        private FeatureInfo _featureInfo;
+        private FeatureInfo? _featureInfo;
 
-        public FeatureInfo ParseWMSResult(string layerName, Stream result)
+        public FeatureInfo ParseWMSResult(string? layerName, Stream result)
         {
             _featureInfo = new FeatureInfo { LayerName = layerName, FeatureInfos = new List<Dictionary<string, string>>() };
             XDocument xdoc;
-            
+
             try
             {
                 xdoc = XDocument.Load(result);
@@ -23,24 +23,24 @@ namespace Mapsui.Providers.Wms
             catch (XmlException e)
             {
                 throw new ApplicationException("Bad formatted XML response", e);
-            }            
+            }
 
             ExtractFeatureInfo(xdoc.Root);
 
             return _featureInfo;
         }
 
-        private void ExtractFeatureInfo(XElement root)
+        private void ExtractFeatureInfo(XElement? root)
         {
             LookExtractMultipleElements(root);
 
-            if (_featureInfo.FeatureInfos.Count == 0)
+            if (_featureInfo?.FeatureInfos?.Count == 0)
                 ExtractFeatures(root);
         }
 
-        private void LookExtractMultipleElements(XElement layer)
+        private void LookExtractMultipleElements(XElement? layer)
         {
-            if (!layer.HasElements) return;
+            if (layer==null || !layer.HasElements) return;
             var element = layer.Descendants().FirstOrDefault();
 
             if (element != null)
@@ -55,11 +55,14 @@ namespace Mapsui.Providers.Wms
             }
         }
 
-        private void ExtractFeatures(XContainer layer)
+        private void ExtractFeatures(XContainer? layer)
         {
+            if (layer == null)
+                return;
+            
             foreach (var feature in layer.Elements())
             {
-                _featureInfo.FeatureInfos.Add(ExtractFeatureElements(feature));
+                _featureInfo?.FeatureInfos?.Add(ExtractFeatureElements(feature));
             }
         }
 

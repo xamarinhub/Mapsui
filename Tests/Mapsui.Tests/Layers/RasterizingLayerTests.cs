@@ -2,13 +2,16 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using Mapsui.Layers;
-using Mapsui.Providers;
-using NUnit.Framework;
 using BruTile.Predefined;
-using Mapsui.Extensions;
+using Mapsui.Layers;
+using Mapsui.Nts;
+using Mapsui.Providers;
 using Mapsui.Rendering;
 using Mapsui.Rendering.Skia;
+using Mapsui.Tests.Common.TestTools;
+using Mapsui.Tiling.Extensions;
+using NetTopologySuite.Geometries;
+using NUnit.Framework;
 
 namespace Mapsui.Tests.Layers
 {
@@ -16,47 +19,44 @@ namespace Mapsui.Tests.Layers
     public class RasterizingLayerTests
     {
         [Test]
-        //!!![Ignore("This test is hanging")]
         public void TestTimer()
         {
             // arrange
-            var layer = new RasterizingLayer(CreatePointLayer());
+            DefaultRendererFactory.Create = () => new MapRenderer();
+            using var memoryLayer = CreatePointLayer();
+            using var layer = new RasterizingLayer(memoryLayer);
             var schema = new GlobalSphericalMercator();
-            var box = schema.Extent.ToBoundingBox();
+            var box = schema.Extent.ToMRect();
             var resolution = schema.Resolutions.First().Value.UnitsPerPixel;
-            var waitHandle = new AutoResetEvent(false);
-            DefaultRendererFactory.Create = () => new MapRenderer(); // Using xaml renderer here to test rasterizer. Suboptimal. 
-            
-            Assert.AreEqual(0, layer.GetFeaturesInView(box, resolution).Count());
-            layer.DataChanged += (sender, args) =>
+            using var waitHandle = new AutoResetEvent(false);
+
+            Assert.AreEqual(0, layer.GetFeatures(box, resolution).Count());
+            layer.DataChanged += (_, _) =>
             {
                 // assert
                 waitHandle.Set();
             };
 
+            var fetchInfo = new FetchInfo(box, resolution, null, ChangeType.Discrete);
+
             // act
-            layer.RefreshData(box, resolution, ChangeType.Discrete);
+            layer.RefreshData(fetchInfo);
 
             // assert
             waitHandle.WaitOne();
-            Assert.AreEqual(layer.GetFeaturesInView(box, resolution).Count(), 1);
+            Assert.AreEqual(layer.GetFeatures(box, resolution).Count(), 1);
         }
 
-        private static MemoryLayer CreatePointLayer()
+        private static TestLayer CreatePointLayer()
         {
-            var random = new Random();
-            var features = new List<IGeometryFeature>();
+            var random = new Random(3);
+            var features = new List<IFeature>();
             for (var i = 0; i < 100; i++)
             {
-                var feature = new Feature
-                {
-                    Geometry = new Geometries.Point(random.Next(100000, 5000000), random.Next(100000, 5000000))
-                };
-                features.Add(feature);
+                features.Add(new GeometryFeature(
+                    new Point(random.Next(100000, 5000000), random.Next(100000, 5000000))));
             }
-            var provider = new MemoryProvider<IGeometryFeature>(features);
-
-            return new MemoryLayer { DataSource = provider };
+            return new TestLayer() { DataSource = new MemoryProvider(features) };
         }
     }
 }

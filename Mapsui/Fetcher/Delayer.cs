@@ -6,10 +6,10 @@ namespace Mapsui.Fetcher
     /// <summary>
     /// Makes sure a method is always called 'MillisecondsToDelay' after the previous call.
     /// </summary>
-    public class Delayer
+    public class Delayer : IDisposable
     {
         private readonly Timer _waitTimer;
-        private Action _action;
+        private Action? _action;
         private bool _waiting;
 
         /// <summary>
@@ -52,7 +52,21 @@ namespace Mapsui.Fetcher
             }
         }
 
-        private void WaitTimerElapsed(object state)
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _waitTimer.Dispose();
+            }
+        }
+
+        private void WaitTimerElapsed(object? state)
         {
             if (_action != null)
             {

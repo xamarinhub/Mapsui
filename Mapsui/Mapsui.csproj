@@ -1,19 +1,26 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(SolutionName)' != 'Mapsui.Mac.Legacy'">$(TargetFrameworks);net6.0</TargetFrameworks>
     <Configurations>Release;Debug</Configurations>
-    <RuntimeIdentifiers>win10-x86;win10-x64;win10-arm64</RuntimeIdentifiers>
+    <!--Revert TreatWarningsAsErrors to false because of vague build error on server -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-  </PropertyGroup>
+
   <ItemGroup>
-    <PackageReference Include="BruTile" Version="4.0.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
-    <PackageReference Include="System.Drawing.Common" Version="5.0.2" />
+    <EmbeddedResource Include="Resources\Images\Pin.svg" />
   </ItemGroup>
+	 
   <ItemGroup>
-    <ProjectReference Include="..\Mapsui.Geometries\Mapsui.Geometries.csproj" />
+    <PackageReference Include="NeoSmart.AsyncLock" />
+    <PackageReference Include="System.Linq.Async" />
   </ItemGroup>
+  
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" />
+  </ItemGroup>
+
   <PropertyGroup>
     <DebugType>portable</DebugType>
   </PropertyGroup>

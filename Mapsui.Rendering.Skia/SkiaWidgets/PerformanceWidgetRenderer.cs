@@ -1,19 +1,20 @@
-﻿using Mapsui.Widgets;
+﻿using System;
+using Mapsui.Widgets;
 using Mapsui.Widgets.PerformanceWidget;
 using SkiaSharp;
 
 namespace Mapsui.Rendering.Skia.SkiaWidgets
 {
-    public class PerformanceWidgetRenderer : ISkiaWidgetRenderer
+    public class PerformanceWidgetRenderer : ISkiaWidgetRenderer, IDisposable
     {
-        readonly SKPaint _textPaint;
-        readonly SKPaint _backgroundPaint;
-        readonly int _textSize;
-        readonly float _widthHeader;
-        readonly string[] _textHeader = { "Last", "Mean", "Frames", "Min", "Max", "Count", "Dropped" };
-        readonly string[] _text = new string[7];
-        SKRect _rect;
-        readonly Geometries.BoundingBox _envelope;
+        private readonly SKPaint _textPaint;
+        private readonly SKPaint _backgroundPaint;
+        private readonly int _textSize;
+        private readonly float _widthHeader;
+        private readonly string[] _textHeader = { "Last", "Mean", "Frames", "Min", "Max", "Count", "Dropped" };
+        private readonly string[] _text = new string[7];
+        private readonly SKRect _rect;
+        private readonly MRect _envelope;
 
         /// <summary>
         /// Renderer for PerformanceWidget
@@ -37,7 +38,7 @@ namespace Mapsui.Rendering.Skia.SkiaWidgets
 
             _rect = new SKRect(x, y, x + width + 4, y + _textHeader.Length * (textSize + 2) - 2 + 4);
 
-            _envelope = new Geometries.BoundingBox(_rect.Left, _rect.Top, _rect.Right, _rect.Bottom);
+            _envelope = new MRect(_rect.Left, _rect.Top, _rect.Right, _rect.Bottom);
         }
 
         public void Draw(SKCanvas canvas, IReadOnlyViewport viewport, IWidget widget, float layerOpacity)
@@ -64,6 +65,12 @@ namespace Mapsui.Rendering.Skia.SkiaWidgets
             }
 
             widget.Envelope = _envelope;
+        }
+
+        public virtual void Dispose()
+        {
+            _textPaint.Dispose();
+            _backgroundPaint.Dispose();
         }
     }
 }

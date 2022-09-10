@@ -1,12 +1,11 @@
 ﻿using System.Collections.Generic;
-using System.IO;
+using System.Threading.Tasks;
 using BruTile;
-using Mapsui.Extensions;
-using Mapsui.Geometries;
 using Mapsui.Layers;
 using Mapsui.Providers;
 using Mapsui.Samples.Common;
 using Mapsui.Styles;
+using Mapsui.Tiling.Extensions;
 using Mapsui.UI;
 
 namespace Mapsui.Tests.Common.Maps
@@ -16,19 +15,23 @@ namespace Mapsui.Tests.Common.Maps
         public string Name => "Tiles";
         public string Category => "Tests";
 
-        public void Setup(IMapControl mapControl)
+        public async Task<Map> CreateMapAsync()
         {
-            mapControl.Map = CreateMap();
-        }
+            var layer = await CreateLayerAsync();
 
-        public static Map CreateMap()
-        {
             var map = new Map
             {
-                BackColor = Color.Transparent,
-                Home = n => n.NavigateTo(new Point(-7641856, 4804912), 51116)
+                BackColor = Color.FromString("WhiteSmoke"),
+                Home = n => n.NavigateToFullEnvelope()
             };
 
+            map.Layers.Add(layer);
+
+            return map;
+        }
+
+        private static async Task<MemoryLayer> CreateLayerAsync()
+        {
             var tileIndexes = new[]
             {
                 new TileIndex(0, 0, 1),
@@ -37,14 +40,17 @@ namespace Mapsui.Tests.Common.Maps
                 new TileIndex(1, 1, 1)
             };
 
-            var features = TileIndexToFeatures(tileIndexes, new SampleTileSource());
-            map.Layers.Add(new MemoryLayer {DataSource = new MemoryProvider<IGeometryFeature>(features), Name = "Tiles"});
-            return map;
+            return new MemoryLayer
+            {
+                Features = await TileIndexToFeaturesAsync(tileIndexes, new SampleTileSource()),
+                Name = "Tiles",
+                Style = new RasterStyle()
+            };
         }
 
-        private static List<IGeometryFeature> TileIndexToFeatures(TileIndex[] tileIndexes, ITileSource tileSource)
+        private static async Task<List<RasterFeature>> TileIndexToFeaturesAsync(TileIndex[] tileIndexes, ITileSource tileSource)
         {
-            var features = new List<IGeometryFeature>();
+            var features = new List<RasterFeature>();
             foreach (var tileIndex in tileIndexes)
             {
                 var tileInfo = new TileInfo
@@ -54,13 +60,8 @@ namespace Mapsui.Tests.Common.Maps
                         new TileRange(tileIndex.Col, tileIndex.Row), tileIndex.Level, tileSource.Schema)
                 };
 
-                var feature = new Feature
-                {
-                    Geometry = new Raster(new MemoryStream(
-                        tileSource.GetTile(tileInfo)), tileInfo.Extent.ToBoundingBox())
-                };
-
-                features.Add(feature);
+                var raster = new MRaster(await tileSource.GetTileAsync(tileInfo), tileInfo.Extent.ToMRect());
+                features.Add(new RasterFeature(raster));
             }
             return features;
         }

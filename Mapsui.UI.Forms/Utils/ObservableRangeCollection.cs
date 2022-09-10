@@ -24,7 +24,7 @@
 
         #region Private Fields    
         [NonSerialized]
-        private DeferredEventsCollection _deferredEvents;
+        private DeferredEventsCollection? _deferredEvents;
         #endregion Private Fields
 
 
@@ -92,7 +92,7 @@
         /// Inserts the elements of a collection into the <see cref="ObservableCollection{T}"/> at the specified index.
         /// </summary>
         /// <param name="index">The zero-based index at which the new elements should be inserted.</param>
-        /// <param name="collection">The collection whose elements should be inserted into the List<T>.
+        /// <param name="collection">The collection whose elements should be inserted into the List{T}.
         /// The collection itself cannot be null, but it can contain elements that are null, if type T is a reference type.</param>                
         /// <exception cref="ArgumentNullException"><paramref name="collection"/> is null.</exception>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="index"/> is not in the collection range.</exception>
@@ -151,7 +151,7 @@
                 if (countable.Count == 0)
                     return;
                 else if (countable.Count == 1)
-                    using (IEnumerator<T> enumerator = countable.GetEnumerator())
+                    using (var enumerator = countable.GetEnumerator())
                     {
                         enumerator.MoveNext();
                         Remove(enumerator.Current);
@@ -167,8 +167,8 @@
 
             var clusters = new Dictionary<int, List<T>>();
             var lastIndex = -1;
-            List<T> lastCluster = null;
-            foreach (T item in collection)
+            List<T>? lastCluster = null;
+            foreach (var item in collection)
             {
                 var index = IndexOf(item);
                 if (index < 0)
@@ -193,7 +193,7 @@
             if (Count == 0)
                 OnCollectionReset();
             else
-                foreach (KeyValuePair<int, List<T>> cluster in clusters)
+                foreach (var cluster in clusters)
                     OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, cluster.Value, cluster.Key));
 
         }
@@ -235,7 +235,7 @@
             if (Count == 0)
                 return 0;
 
-            List<T> cluster = null;
+            List<T>? cluster = null;
             var clusterIndex = -1;
             var removedCount = 0;
 
@@ -244,7 +244,7 @@
             {
                 for (var i = 0; i < count; i++, index++)
                 {
-                    T item = Items[index];
+                    var item = Items[index];
                     if (match(item))
                     {
                         Items.RemoveAt(index);
@@ -253,7 +253,7 @@
                         if (clusterIndex == index)
                         {
                             Debug.Assert(cluster != null);
-                            cluster.Add(item);
+                            cluster!.Add(item);
                         }
                         else
                         {
@@ -307,7 +307,7 @@
 
             //Items will always be List<T>, see constructors
             var items = (List<T>)Items;
-            List<T> removedItems = items.GetRange(index, count);
+            var removedItems = items.GetRange(index, count);
 
             CheckReentrancy();
 
@@ -417,19 +417,19 @@
                 var addedCount = list.Count;
 
                 var changesMade = false;
-                List<T>
+                List<T>?
                     newCluster = null,
                     oldCluster = null;
 
 
-                int i = index;
+                var i = index;
                 for (; i < rangeCount && i - index < addedCount; i++)
                 {
                     //parallel position
                     T old = this[i], @new = list[i - index];
                     if (comparer.Equals(old, @new))
                     {
-                        OnRangeReplaced(i, newCluster, oldCluster);
+                        OnRangeReplaced(i, newCluster!, oldCluster);
                         continue;
                     }
                     else
@@ -445,14 +445,14 @@
                         else
                         {
                             newCluster.Add(@new);
-                            oldCluster.Add(old);
+                            oldCluster!.Add(old);
                         }
 
                         changesMade = true;
                     }
                 }
 
-                OnRangeReplaced(i, newCluster, oldCluster);
+                OnRangeReplaced(i, newCluster!, oldCluster);
 
                 //exceeding position
                 if (count != addedCount)
@@ -461,7 +461,7 @@
                     if (count > addedCount)
                     {
                         var removedCount = rangeCount - addedCount;
-                        T[] removed = new T[removedCount];
+                        var removed = new T[removedCount];
                         items.CopyTo(i, removed, 0, removed.Length);
                         items.RemoveRange(i, removedCount);
                         OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Remove, removed, i));
@@ -469,10 +469,10 @@
                     else
                     {
                         var k = i - index;
-                        T[] added = new T[addedCount - k];
-                        for (int j = k; j < addedCount; j++)
+                        var added = new T[addedCount - k];
+                        for (var j = k; j < addedCount; j++)
                         {
-                            T @new = list[j];
+                            var @new = list[j];
                             added[j - k] = @new;
                         }
                         items.InsertRange(i, added);
@@ -524,7 +524,7 @@
                 return;
 
             CheckReentrancy();
-            T originalItem = this[index];
+            var originalItem = this[index];
             base.SetItem(index, item);
 
             OnIndexerPropertyChanged();
@@ -538,7 +538,7 @@
         /// </summary>
         /// <remarks>
         /// When overriding this method, either call its base implementation
-        /// or call <see cref="BlockReentrancy"/> to guard against reentrant collection changes.
+        /// or call <see cref="ObservableCollection{T}.BlockReentrancy"/> to guard against reentrant collection changes.
         /// </remarks>
         protected override void OnCollectionChanged(NotifyCollectionChangedEventArgs e)
         {
@@ -550,7 +550,10 @@
             base.OnCollectionChanged(e);
         }
 
-        protected virtual IDisposable DeferEvents() => new DeferredEventsCollection(this);
+        protected virtual IDisposable DeferEvents()
+        {
+            return new DeferredEventsCollection(this);
+        }
 
         #endregion Protected Methods
 
@@ -570,7 +573,7 @@
         /// <returns></returns>
         private static bool ContainsAny(IEnumerable<T> collection)
         {
-            using (IEnumerator<T> enumerator = collection.GetEnumerator())
+            using (var enumerator = collection.GetEnumerator())
                 return enumerator.MoveNext();
         }
 
@@ -586,20 +589,26 @@
         /// <summary>
         /// /// Helper to raise a PropertyChanged event for the Indexer property
         /// /// </summary>
-        private void OnIndexerPropertyChanged() =>
-          OnPropertyChanged(EventArgsCache.IndexerPropertyChanged);
+        private void OnIndexerPropertyChanged()
+        {
+            OnPropertyChanged(EventArgsCache.IndexerPropertyChanged);
+        }
 
         /// <summary>
         /// Helper to raise CollectionChanged event to any listeners
         /// </summary>
-        private void OnCollectionChanged(NotifyCollectionChangedAction action, object oldItem, object newItem, int index) =>
-          OnCollectionChanged(new NotifyCollectionChangedEventArgs(action, newItem, oldItem, index));
+        private void OnCollectionChanged(NotifyCollectionChangedAction action, object? oldItem, object? newItem, int index)
+        {
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(action, newItem, oldItem, index));
+        }
 
         /// <summary>
         /// Helper to raise CollectionChanged event with action == Reset to any listeners
         /// </summary>
-        private void OnCollectionReset() =>
-          OnCollectionChanged(EventArgsCache.ResetCollectionChanged);
+        private void OnCollectionReset()
+        {
+            OnCollectionChanged(EventArgsCache.ResetCollectionChanged);
+        }
 
         /// <summary>
         /// Helper to raise event for clustered action and clear cluster.
@@ -609,7 +618,7 @@
         /// <param name="oldCluster"></param>
         //TODO should have really been a local method inside ReplaceRange(int index, int count, IEnumerable<T> collection, IEqualityComparer<T> comparer),
         //move when supported language version updated.
-        private void OnRangeReplaced(int followingItemIndex, ICollection<T> newCluster, ICollection<T> oldCluster)
+        private void OnRangeReplaced(int followingItemIndex, ICollection<T>? newCluster, ICollection<T>? oldCluster)
         {
             if (oldCluster == null || oldCluster.Count == 0)
             {
@@ -620,12 +629,12 @@
             OnCollectionChanged(
                 new NotifyCollectionChangedEventArgs(
                     NotifyCollectionChangedAction.Replace,
-                    new List<T>(newCluster),
+                    new List<T>(newCluster ?? new List<T>()),
                     new List<T>(oldCluster),
                     followingItemIndex - oldCluster.Count));
 
             oldCluster.Clear();
-            newCluster.Clear();
+            newCluster?.Clear();
         }
 
         #endregion Private Methods
@@ -643,7 +652,7 @@
             public DeferredEventsCollection(ObservableRangeCollection<T> collection)
             {
                 Debug.Assert(collection != null);
-                Debug.Assert(collection._deferredEvents == null);
+                Debug.Assert(collection!._deferredEvents == null);
                 _collection = collection;
                 _collection._deferredEvents = this;
             }

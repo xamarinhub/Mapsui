@@ -1,7 +1,9 @@
-﻿using Mapsui.Geometries;
-using Mapsui.Layers;
-using Mapsui.Providers;
+﻿using Mapsui.Layers;
+using Mapsui.Nts;
+using NetTopologySuite.Geometries;
 using NUnit.Framework;
+
+#pragma warning disable IDISP004 // Don't ignore created IDisposable
 
 namespace Mapsui.Tests.Layers
 {
@@ -12,17 +14,16 @@ namespace Mapsui.Tests.Layers
         public void DoNotCrashOnNullOrEmptyGeometries()
         {
             // arrange
-            var writableLayer = new WritableLayer();
-            writableLayer.Add(new Feature());
-            writableLayer.Add(new Feature { Geometry = new Point() });
-            writableLayer.Add(new Feature { Geometry = new LineString() });
-            writableLayer.Add(new Feature { Geometry = new Polygon() });
-
+            using var writableLayer = new WritableLayer();
+            writableLayer.Add(new GeometryFeature());
+            writableLayer.Add(new GeometryFeature((Point?)null));
+            writableLayer.Add(new GeometryFeature((LineString?)null));
+            writableLayer.Add(new GeometryFeature((Polygon?)null));
             // act
-            var extents = writableLayer.Envelope;
+            var extent = writableLayer.Extent;
 
             // assert
-            Assert.IsNull(extents);
+            Assert.IsNull(extent);
         }
     }
 }

@@ -1,14 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using Mapsui.Geometries;
 using Mapsui.Layers;
 using Mapsui.Providers;
 using Mapsui.Rendering;
 using Mapsui.Rendering.Skia.SkiaStyles;
 using Mapsui.Samples.Common.Helpers;
 using Mapsui.Styles;
+using Mapsui.Tiling;
 using Mapsui.UI;
-using Mapsui.Utilities;
 using SkiaSharp;
 
 namespace Mapsui.Samples.Common.Maps
@@ -23,16 +22,16 @@ namespace Mapsui.Samples.Common.Maps
 
     public class SkiaCustomStyleRenderer : ISkiaStyleRenderer
     {
-        public static Random Random = new Random();
-        public bool Draw(SKCanvas canvas, IReadOnlyViewport viewport, ILayer layer, IGeometryFeature feature, IStyle style, ISymbolCache symbolCache)
+        public static Random Random = new(1);
+        public bool Draw(SKCanvas canvas, IReadOnlyViewport viewport, ILayer layer, IFeature feature, IStyle style, ISymbolCache symbolCache, long iteration)
         {
-            if (!(feature.Geometry is Point worldPoint))
-                return false;
+            if (!(feature is PointFeature pointFeature)) return false;
+            var worldPoint = pointFeature.Point;
 
             var screenPoint = viewport.WorldToScreen(worldPoint);
             var color = new SKColor((byte)Random.Next(0, 256), (byte)Random.Next(0, 256), (byte)Random.Next(0, 256), (byte)(256.0 * layer.Opacity * style.Opacity));
-            var colored = new SKPaint() { Color = color, IsAntialias = true };
-            var black = new SKPaint() { Color = SKColors.Black, IsAntialias = true };
+            using var colored = new SKPaint { Color = color, IsAntialias = true };
+            using var black = new SKPaint { Color = SKColors.Black, IsAntialias = true };
 
             canvas.Translate((float)screenPoint.X, (float)screenPoint.Y);
             canvas.DrawCircle(0, 0, 15, colored);
@@ -40,17 +39,17 @@ namespace Mapsui.Samples.Common.Maps
             canvas.DrawCircle(8, -12, 8, colored);
             canvas.DrawCircle(8, -8, 2, black);
             canvas.DrawCircle(-8, -8, 2, black);
-            using (var path = new SKPath())
-            {
-                path.ArcTo(new SKRect(-8, 2, 8, 10), 25, 135, true);
-                canvas.DrawPath(path, new SKPaint() { Style = SKPaintStyle.Stroke, Color = SKColors.Black, IsAntialias = true });
-            }
+
+            using var path = new SKPath();
+            path.ArcTo(new SKRect(-8, 2, 8, 10), 25, 135, true);
+            using var skPaint = new SKPaint { Style = SKPaintStyle.Stroke, Color = SKColors.Black, IsAntialias = true };
+            canvas.DrawPath(path, skPaint);
 
             return true;
         }
     }
 
-    public class CustomStyleSample : ISample
+    public class CustomStyleSample : IMapControlSample
     {
         public string Name => "Custom Style";
         public string Category => "Special";
@@ -68,36 +67,30 @@ namespace Mapsui.Samples.Common.Maps
             var map = new Map();
 
             map.Layers.Add(OpenStreetMap.CreateTileLayer());
-            map.Layers.Add(CreateStylesLayer(map.Envelope));
-            
+            map.Layers.Add(CreateStylesLayer(map.Extent));
+
             return map;
         }
 
-        private static ILayer CreateStylesLayer(BoundingBox envelope)
+        private static ILayer CreateStylesLayer(MRect? envelope)
         {
             return new MemoryLayer
             {
                 Name = "Custome Style Layer",
-                DataSource = CreateMemoryProviderWithDiverseSymbols(envelope, 25),
+                Features = CreateDiverseFeatures(RandomPointGenerator.GenerateRandomPoints(envelope, 25)),
                 Style = null,
                 IsMapInfoLayer = true
             };
         }
 
-        public static MemoryProvider<IGeometryFeature> CreateMemoryProviderWithDiverseSymbols(BoundingBox envelope, int count = 100)
+        private static IEnumerable<IFeature> CreateDiverseFeatures(IEnumerable<MPoint> randomPoints)
         {
-            
-            return new MemoryProvider<IGeometryFeature>(CreateDiverseFeatures(RandomPointHelper.GenerateRandomPoints(envelope, count)));
-        }
-
-        private static IEnumerable<IGeometryFeature> CreateDiverseFeatures(IEnumerable<IGeometry> randomPoints)
-        {
-            var features = new List<IGeometryFeature>();
+            var features = new List<IFeature>();
             var style = new CustomStyle();
             var counter = 1;
             foreach (var point in randomPoints)
             {
-                var feature = new Feature { Geometry = point };
+                var feature = new PointFeature(point);
                 feature["Label"] = $"I'm no. {counter++} and, \nautsch, you hit me!";
                 feature.Styles.Add(style); // Here the custom style is set!
                 feature.Styles.Add(SmalleDot());

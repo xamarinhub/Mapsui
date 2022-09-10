@@ -1,19 +1,8 @@
-// Copyright 2005, 2006 - Morten Nielsen (www.iter.dk)
-//
-// This file is part of SharpMap.
-// Mapsui is free software; you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
-// (at your option) any later version.
-// 
-// SharpMap is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Lesser General Public License for more details.
+// Copyright (c) The Mapsui authors.
+// The Mapsui authors licensed this file under the MIT license.
+// See the LICENSE file in the project root for full license information.
 
-// You should have received a copy of the GNU Lesser General Public License
-// along with SharpMap; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
+// This file was originally created by Morten Nielsen (www.iter.dk) as part of SharpMap
 
 using System;
 using System.Collections.Concurrent;
@@ -21,9 +10,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using Mapsui.Fetcher;
-using Mapsui.Geometries;
 using Mapsui.Layers;
-using Mapsui.Projection;
 using Mapsui.Styles;
 using Mapsui.UI;
 using Mapsui.Widgets;
@@ -34,9 +21,9 @@ namespace Mapsui
     /// Map class
     /// </summary>
     /// <remarks>
-    /// Map holds all map related infos like transformation, layers, widgets and so on.
+    /// Map holds all map related infos like the target CRS, layers, widgets and so on.
     /// </remarks>
-    public class Map : INotifyPropertyChanged, IMap
+    public class Map : INotifyPropertyChanged, IMap, IDisposable
     {
         private LayerCollection _layers = new();
         private Color _backColor = Color.White;
@@ -95,12 +82,7 @@ namespace Mapsui
         /// <summary>
         /// Projection type of Map. Normally in format like "EPSG:3857"
         /// </summary>
-        public string CRS { get; set; }
-
-        /// <summary>
-        /// Transformation to use for the different coordinate systems
-        /// </summary>
-        public ITransformation Transformation { get; set; }
+        public string? CRS { get; set; }
 
         /// <summary>
         /// A collection of layers. The first layer in the list is drawn first, the last one on top.
@@ -140,55 +122,55 @@ namespace Mapsui
         }
 
         /// <summary>
-        /// Gets the extents of the map based on the extents of all the layers in the layers collection
+        /// Gets the extent of the map based on the extent of all the layers in the layers collection
         /// </summary>
-        /// <returns>Full map extents</returns>
-        public BoundingBox Envelope
+        /// <returns>Full map extent</returns>
+        public MRect? Extent
         {
             get
             {
                 if (_layers.Count == 0) return null;
 
-                BoundingBox bbox = null;
+                MRect? extent = null;
                 foreach (var layer in _layers)
                 {
-                    bbox = bbox == null ? layer.Envelope : bbox.Join(layer.Envelope);
+                    extent = extent == null ? layer.Extent : extent.Join(layer.Extent);
                 }
-                return bbox;
+                return extent;
             }
         }
 
         /// <summary>
         /// List of all native resolutions of this map
         /// </summary>
-        public IReadOnlyList<double> Resolutions { get; private set; }
+        public IReadOnlyList<double> Resolutions { get; private set; } = new List<double>();
 
         /// <summary>
         /// Called whenever a property changed
         /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         /// <summary>
         /// DataChanged should be triggered by any data changes of any of the child layers
         /// </summary>
-        public event DataChangedEventHandler DataChanged;
+        public event DataChangedEventHandler? DataChanged;
 
 #pragma warning disable 67
         [Obsolete("Use PropertyChanged instead", true)]
-        public event EventHandler RefreshGraphics;
+        public event EventHandler? RefreshGraphics;
 #pragma warning restore 67
 
         /// <summary>
         /// Called whenever the map is clicked. The MapInfoEventArgs contain the features that were hit in
         /// the layers that have IsMapInfoLayer set to true. 
         /// </summary>
-        public event EventHandler<MapInfoEventArgs> Info;
-        
+        public event EventHandler<MapInfoEventArgs>? Info;
+
         [Obsolete("Use your own hover event instead and call MapControl.GetMapInfo", true)]
 #pragma warning disable 67
-        public event EventHandler<MapInfoEventArgs> Hover;
+        public event EventHandler<MapInfoEventArgs>? Hover;
 #pragma warning restore 67
-        
+
         /// <summary>
         /// Abort fetching of all layers
         /// </summary>
@@ -211,14 +193,15 @@ namespace Mapsui
             }
         }
 
-        public void RefreshData(BoundingBox extent, double resolution, ChangeType changeType)
+        public void RefreshData(FetchInfo fetchInfo)
         {
             foreach (var layer in _layers.ToList())
             {
-                layer.RefreshData(extent, resolution, changeType);
+                if (layer is IAsyncDataFetcher asyncDataFetcher)
+                    asyncDataFetcher.RefreshData(fetchInfo);
             }
         }
-        
+
         private void LayersCollectionChanged(object sender, LayerCollectionChangedEventArgs args)
         {
             foreach (var layer in args.RemovedLayers ?? Enumerable.Empty<ILayer>())
@@ -234,9 +217,6 @@ namespace Mapsui
         {
             layer.DataChanged += LayerDataChanged;
             layer.PropertyChanged += LayerPropertyChanged;
-
-            layer.Transformation = Transformation;
-            layer.CRS = CRS;
         }
 
         private void LayerRemoved(ILayer layer)
@@ -288,12 +268,12 @@ namespace Mapsui
             return items.Select(i => i.Value).OrderByDescending(i => i).ToList();
         }
 
-        private void LayerPropertyChanged(object sender, PropertyChangedEventArgs e)
+        private void LayerPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             OnPropertyChanged(sender, e.PropertyName);
         }
-        
-        private void OnPropertyChanged(object sender, string propertyName)
+
+        private void OnPropertyChanged(object? sender, string? propertyName)
         {
             PropertyChanged?.Invoke(sender, new PropertyChangedEventArgs(propertyName));
         }
@@ -325,11 +305,36 @@ namespace Mapsui
         /// This method is to invoke the Info event from the Map. This method is called
         /// by the MapControl/MapView and should usually not be called from user code.
         /// </summary>
-        public void OnInfo(MapInfoEventArgs mapInfoEventArgs)
+        public void OnInfo(MapInfoEventArgs? mapInfoEventArgs)
         {
             if (mapInfoEventArgs == null) return;
 
             Info?.Invoke(this, mapInfoEventArgs);
+        }
+
+        public virtual void Dispose()
+        {
+            foreach (var layer in Layers)
+            {
+                // remove Event so that no memory leaks occour
+                LayerRemoved(layer);
+            }
+
+            // clear the layers
+            Layers.Clear();
+        }
+
+        public bool UpdateAnimations()
+        {
+            var areAnimationsRunning = false;
+
+            foreach (var layer in Layers)
+            {
+                if (layer.UpdateAnimations())
+                    areAnimationsRunning = true;
+            }
+
+            return areAnimationsRunning;
         }
     }
 }

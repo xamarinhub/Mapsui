@@ -1,7 +1,8 @@
 ﻿using System;
 using System.IO;
 using System.Threading;
-using Mapsui.Geometries;
+using System.Threading.Tasks;
+using Mapsui.Rendering.Skia.Tests.Extensions;
 using Mapsui.Tests.Common.Maps;
 using NUnit.Framework;
 using SkiaSharp;
@@ -9,21 +10,21 @@ using SkiaSharp;
 namespace Mapsui.Rendering.Skia.Tests
 {
     [TestFixture, Apartment(ApartmentState.STA)]
-    class MapRendererTests
+    internal class MapRendererTests
     {
         [Test]
         public void RenderPointsWithVectorStyle()
         {
             // arrange
-            var map = VectorStyleSample.CreateMap();
-            var viewport = new Viewport {Center = new Point(100, 100), Width = 200, Height = 200, Resolution = 1};
+            using var map = VectorStyleSample.CreateMap();
+            var viewport = map.Extent!.Multiply(3).ToViewport(200);
             const string fileName = "vector_symbol.png";
 
             // act
-            var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor);
+            using var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor, 2);
 
             // aside
-            File.WriteToGeneratedFolder(fileName, bitmap);
+            File.WriteToGeneratedTestImagesFolder(fileName, bitmap);
 
             // assert
             Assert.IsTrue(CompareBitmaps(File.ReadFromOriginalFolder(fileName), bitmap, 1, 0.99));
@@ -33,21 +34,33 @@ namespace Mapsui.Rendering.Skia.Tests
         public void RenderPointWithBitmapSymbols()
         {
             // arrange
-            var map = BitmapSymbolSample.CreateMap();
-            var viewport = new Viewport
-            {
-                Center = new Point(100, 100),
-                Width = 200,
-                Height = 200,
-                Resolution = 1
-            };
+            using var map = BitmapSymbolSample.CreateMap();
+            var viewport = map.Extent!.Multiply(3).ToViewport(200);
             const string fileName = "points_with_symbolstyle.png";
 
             // act
-            var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor);
+            using var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor, 2);
 
             // aside
-            File.WriteToGeneratedFolder(fileName, bitmap);
+            File.WriteToGeneratedTestImagesFolder(fileName, bitmap);
+
+            // assert
+            Assert.IsTrue(CompareBitmaps(File.ReadFromOriginalFolder(fileName), bitmap, 1, 0.99));
+        }
+
+        [Test]
+        public void RenderPointWithBitmapSymbolsInCollection()
+        {
+            // arrange
+            using var map = BitmapSymbolInCollectionSample.CreateMap();
+            var viewport = map.Extent!.Multiply(3).ToViewport(200);
+            const string fileName = "points_with_symbolstyle.png"; // Todo: Do not reuse the png.
+
+            // act
+            using var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor, 2);
+
+            // aside
+            File.WriteToGeneratedTestImagesFolder(fileName, bitmap);
 
             // assert
             Assert.IsTrue(CompareBitmaps(File.ReadFromOriginalFolder(fileName), bitmap, 1, 0.99));
@@ -57,21 +70,15 @@ namespace Mapsui.Rendering.Skia.Tests
         public void RenderPointWithSvgSymbols()
         {
             // arrange
-            var map = SvgSymbolSample.CreateMap();
-            var viewport = new Viewport
-            {
-                Center = new Point(100, 100),
-                Width = 200,
-                Height = 200,
-                Resolution = 1
-            };
+            using var map = SvgSymbolSample.CreateMap();
+            var viewport = map.Extent!.Multiply(3).ToViewport(200);
             const string fileName = "points_with_svgsymbolstyle.png";
 
             // act
-            var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor);
+            using var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor, 2);
 
             // aside
-            File.WriteToGeneratedFolder(fileName, bitmap);
+            File.WriteToGeneratedTestImagesFolder(fileName, bitmap);
 
             // assert
             Assert.IsTrue(CompareBitmaps(File.ReadFromOriginalFolder(fileName), bitmap, 1, 0.99));
@@ -81,10 +88,12 @@ namespace Mapsui.Rendering.Skia.Tests
         public void RenderBitmapAtlas()
         {
             // arrange
-            var map = BitmapSample.CreateMap();
+            using var map = BitmapAtlasSample.CreateMap();
+
             var viewport = new Viewport
             {
-                Center = new Point(256, 200),
+                CenterX = 256,
+                CenterY = 200,
                 Width = 512,
                 Height = 400,
                 Resolution = 1
@@ -93,10 +102,10 @@ namespace Mapsui.Rendering.Skia.Tests
             const string fileName = "bitmap_atlas.png";
 
             // act
-            var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor);
+            using var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor);
 
             // aside
-            File.WriteToGeneratedFolder(fileName, bitmap);
+            File.WriteToGeneratedTestImagesFolder(fileName, bitmap);
 
             // assert
             Assert.IsTrue(CompareBitmaps(File.ReadFromOriginalFolder(fileName), bitmap, 1, 0.99));
@@ -106,21 +115,15 @@ namespace Mapsui.Rendering.Skia.Tests
         public void RenderRotatedBitmapSymbolWithOffset()
         {
             // arrange
-            var map = BitmapSymbolWithRotationAndOffsetSample.CreateMap();
-            var viewport = new Viewport
-            {
-                Center = new Point(80, 80),
-                Width = 200,
-                Height = 200,
-                Resolution = 1
-            };
+            using var map = BitmapSymbolWithRotationAndOffsetSample.CreateMap();
+            var viewport = map.Extent!.Multiply(4).ToViewport(200);
             const string fileName = "bitmap_symbol.png";
 
             // act
-            var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor);
+            using var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor, 2);
 
             // aside
-            File.WriteToGeneratedFolder(fileName, bitmap);
+            File.WriteToGeneratedTestImagesFolder(fileName, bitmap);
 
             // assert
             Assert.IsTrue(CompareBitmaps(File.ReadFromOriginalFolder(fileName), bitmap, 1, 0.99));
@@ -130,23 +133,15 @@ namespace Mapsui.Rendering.Skia.Tests
         public void RenderPointsWithDifferentSymbolTypes()
         {
             // arrange
-            var map = SymbolTypesSample.CreateMap();
-            
+            using var map = SymbolTypesSample.CreateMap();
+            var viewport = map.Extent!.Multiply(3).ToViewport(200);
             const string fileName = "vector_symbol_symboltype.png";
 
-            var viewport = new Viewport
-            {
-                Center = new Point(0, 0),
-                Width = 200,
-                Height = 200,
-                Resolution = 0.5
-            };
-
             // act
-            var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor);
+            using var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor, 2);
 
             // aside
-            File.WriteToGeneratedFolder(fileName, bitmap);
+            File.WriteToGeneratedTestImagesFolder(fileName, bitmap);
 
             // assert
             Assert.IsTrue(CompareBitmaps(File.ReadFromOriginalFolder(fileName), bitmap, 1, 0.99));
@@ -156,15 +151,15 @@ namespace Mapsui.Rendering.Skia.Tests
         public void RenderSymbolWithWorldUnits()
         {
             // arrange
-            var map = PointInWorldUnits.CreateMap();
-            var viewport = new Viewport {Center = new Point(0, 0), Width = 200, Height = 100, Resolution = 0.5};
+            using var map = PointInWorldUnitsSample.CreateMap();
+            var viewport = map.Extent!.Multiply(3).ToViewport(200);
             const string fileName = "vector_symbol_unittype.png";
 
             // act
-            var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor);
+            using var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor, 2);
 
             // aside
-            File.WriteToGeneratedFolder(fileName, bitmap);
+            File.WriteToGeneratedTestImagesFolder(fileName, bitmap);
 
             // assert
             Assert.IsTrue(CompareBitmaps(File.ReadFromOriginalFolder(fileName), bitmap, 1, 0.99));
@@ -174,21 +169,15 @@ namespace Mapsui.Rendering.Skia.Tests
         public void RenderPolygon()
         {
             // arrange
-            var map = PolygonSample.CreateMap();
-            var viewport = new Viewport
-            {
-                Center = new Point(0, 0),
-                Width = 600,
-                Height = 400,
-                Resolution = 63000
-            };
+            using var map = PolygonSample.CreateMap();
+            var viewport = map.Extent!.Multiply(1.1).ToViewport(600);
             const string fileName = "polygon.png";
 
             // act
-            var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor);
+            using var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor);
 
             // aside
-            File.WriteToGeneratedFolder(fileName, bitmap);
+            File.WriteToGeneratedTestImagesFolder(fileName, bitmap);
 
             // assert
             Assert.IsTrue(CompareBitmaps(File.ReadFromOriginalFolder(fileName), bitmap));
@@ -198,45 +187,33 @@ namespace Mapsui.Rendering.Skia.Tests
         public void RenderLine()
         {
             // arrange
-            var map = LineSample.CreateMap();
-            var viewport = new Viewport
-            {
-                Center = new Point(0, 0),
-                Width = 600,
-                Height = 400,
-                Resolution = 63000
-            };
+            using var map = LineSample.CreateMap();
+            var viewport = map.Extent!.Multiply(1.1).ToViewport(600);
             const string fileName = "line.png";
 
             // act
-            var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor);
+            using var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor);
 
             // aside
-            File.WriteToGeneratedFolder(fileName, bitmap);
+            File.WriteToGeneratedTestImagesFolder(fileName, bitmap);
 
             // assert
             Assert.IsTrue(CompareBitmaps(File.ReadFromOriginalFolder(fileName), bitmap));
         }
 
         [Test]
-        public void RenderTiles()
+        public async Task RenderTilesAsync()
         {
             // arrange
-            var map = TilesSample.CreateMap();
-            var viewport = new Viewport
-            {
-                Center = new Point(-7641856, 4804912),
-                Width = 600,
-                Height = 400,
-                Resolution = 51116
-            };
+            using var map = await (new TilesSample()).CreateMapAsync();
+            var viewport = map.Extent!.Multiply(1.1).ToViewport(600);
             const string fileName = "tilelayer.png";
 
             // act
-            var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor);
+            using var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor);
 
-            // aside;
-            File.WriteToGeneratedFolder(fileName, bitmap);
+            // aside
+            File.WriteToGeneratedTestImagesFolder(fileName, bitmap);
 
             // assert
             Assert.IsTrue(CompareBitmaps(File.ReadFromOriginalFolder(fileName), bitmap, 1, 0.99));
@@ -246,21 +223,69 @@ namespace Mapsui.Rendering.Skia.Tests
         public void RenderLabels()
         {
             // arrange
-            var map = LabelSample.CreateMap();
-            var viewport = new Viewport
-            {
-                Center = new Point(100, 100),
-                Width = 200,
-                Height = 200,
-                Resolution = 1
-            };
+            using var map = LabelSample.CreateMap();
+            var viewport = map.Extent!.Multiply(2).ToViewport(300);
             const string fileName = "labels.png";
 
             // act
-            var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor);
+            using var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor, 2);
 
-            // aside;
-            File.WriteToGeneratedFolder(fileName, bitmap);
+            // aside
+            File.WriteToGeneratedTestImagesFolder(fileName, bitmap);
+
+            // assert
+            Assert.IsTrue(CompareBitmaps(File.ReadFromOriginalFolder(fileName), bitmap, 1, 0.99));
+        }
+
+        [Test]
+        public void RenderProjection()
+        {
+            // arrange
+            using var map = ProjectionSample.CreateMap();
+            var viewport = map.Extent!.Multiply(1.1).ToViewport(600);
+            const string fileName = "projection.png";
+
+            // act 
+            using var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor);
+
+            // aside
+            File.WriteToGeneratedTestImagesFolder(fileName, bitmap);
+
+            // assert
+            Assert.IsTrue(CompareBitmaps(File.ReadFromOriginalFolder(fileName), bitmap, 1, 0.99));
+        }
+
+        [Test]
+        public void RenderStackedLabelsLayer()
+        {
+            // arrange
+            using var map = StackedLabelsSample.CreateMap();
+            var viewport = map.Extent!.Multiply(1.2).ToViewport(600);
+            const string fileName = "stacked_labels.png";
+
+            // act 
+            using var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor);
+
+            // aside
+            File.WriteToGeneratedTestImagesFolder(fileName, bitmap);
+
+            // assert
+            Assert.IsTrue(CompareBitmaps(File.ReadFromOriginalFolder(fileName), bitmap, 1, 0.995));
+        }
+
+        [Test]
+        public void Widgets()
+        {
+            // arrange
+            using var map = WidgetsSample.CreateMap();
+            var viewport = new Viewport { Resolution = 1, Width = 600, Height = 600 };
+            const string fileName = "widgets.png";
+
+            // act
+            using var bitmap = new MapRenderer().RenderToBitmapStream(viewport, map.Layers, map.BackColor, 2, map.Widgets);
+
+            // aside
+            File.WriteToGeneratedTestImagesFolder(fileName, bitmap);
 
             // assert
             Assert.IsTrue(CompareBitmaps(File.ReadFromOriginalFolder(fileName), bitmap, 1, 0.99));
@@ -271,23 +296,40 @@ namespace Mapsui.Rendering.Skia.Tests
             if (color1.Alpha == 0 && color2.Alpha == 0) return true; // If both are transparent all colors are ignored
             if (Math.Abs(color1.Alpha - color2.Alpha) > allowedColorDistance) return false;
             if (Math.Abs(color1.Red - color2.Red) > allowedColorDistance) return false;
-            if (Math.Abs(color1.Green- color2.Green) > allowedColorDistance) return false;
+            if (Math.Abs(color1.Green - color2.Green) > allowedColorDistance) return false;
             if (Math.Abs(color1.Blue - color2.Blue) > allowedColorDistance) return false;
             return true;
         }
 
-        private bool CompareBitmaps(Stream bitmapStream1, Stream bitmapStream2, int allowedColorDistance = 0, double proportionCorrect = 1)
+        public static bool CompareBitmaps(Stream? bitmapStream1, Stream? bitmapStream2, int allowedColorDistance = 0, double proportionCorrect = 1)
         {
             // The bitmaps in WPF can slightly differ from test to test. No idea why. So introduced proportion correct.
 
             long trueCount = 0;
             long falseCount = 0;
 
+            if (bitmapStream1 == null && bitmapStream2 == null)
+            {
+                return true;
+            }
+
+            if (bitmapStream1 == null || bitmapStream2 == null)
+            {
+                return false;
+            }
+
             bitmapStream1.Position = 0;
             bitmapStream2.Position = 0;
 
-            var bitmap1 = SKBitmap.FromImage(SKImage.FromEncodedData(SKData.Create(bitmapStream1)));
-            var bitmap2 = SKBitmap.FromImage(SKImage.FromEncodedData(SKData.Create(bitmapStream2)));
+            using var skData1 = SKData.Create(bitmapStream1);
+            var bitmap1 = SKBitmap.FromImage(SKImage.FromEncodedData(skData1));
+            using var skData2 = SKData.Create(bitmapStream2);
+            var bitmap2 = SKBitmap.FromImage(SKImage.FromEncodedData(skData2));
+
+            if (bitmap1.Width != bitmap2.Width || bitmap1.Height != bitmap2.Height)
+            {
+                return false;
+            }
 
             for (var x = 0; x < bitmap1.Width; x++)
             {
@@ -307,7 +349,7 @@ namespace Mapsui.Rendering.Skia.Tests
                 }
             }
 
-            var proportion = (double)(trueCount - falseCount) / trueCount;
+            var proportion = (double)(trueCount) / (trueCount + falseCount);
             return proportionCorrect <= proportion;
         }
     }

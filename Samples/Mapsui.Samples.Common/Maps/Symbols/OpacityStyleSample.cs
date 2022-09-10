@@ -1,9 +1,13 @@
-﻿using Mapsui.Geometries;
-using Mapsui.Layers;
+﻿using Mapsui.Layers;
+using Mapsui.Nts.Extensions;
 using Mapsui.Providers;
 using Mapsui.Styles;
+using Mapsui.Tiling;
 using Mapsui.UI;
-using Mapsui.Utilities;
+using NetTopologySuite.Geometries;
+using System.Threading.Tasks;
+
+#pragma warning disable IDISP004 // Don't ignore created IDisposable
 
 namespace Mapsui.Samples.Common.Maps
 {
@@ -12,25 +16,20 @@ namespace Mapsui.Samples.Common.Maps
         public string Name => "OpacityStyle";
         public string Category => "Symbols";
 
-        public void Setup(IMapControl mapControl)
-        {
-            mapControl.Map = CreateMap();
-        }
-
-        public static Map CreateMap()
+        public Task<Map> CreateMapAsync()
         {
             var map = new Map();
             map.Layers.Add(OpenStreetMap.CreateTileLayer());
             map.Layers.Add(CreatePolygonLayer());
             map.Layers.Add(CreateLineStringLayer());
-            return map;
+            return Task.FromResult(map);
         }
 
         public static ILayer CreatePolygonLayer()
         {
             return new Layer("Polygons")
             {
-                DataSource = new MemoryProvider<IGeometryFeature>(CreatePolygon()),
+                DataSource = new MemoryProvider(CreatePolygon().ToFeature()),
                 Style = new VectorStyle
                 {
                     Fill = new Brush(new Color(150, 150, 30)),
@@ -49,7 +48,7 @@ namespace Mapsui.Samples.Common.Maps
         {
             return new Layer("Polygons")
             {
-                DataSource = new MemoryProvider<IGeometryFeature>(CreateLineString()),
+                DataSource = new MemoryProvider(CreateLineString().ToFeature()),
                 Style = new VectorStyle
                 {
                     Line = new Pen
@@ -66,31 +65,33 @@ namespace Mapsui.Samples.Common.Maps
 
         private static Polygon CreatePolygon()
         {
-            var polygon = new Polygon();
-            polygon.ExteriorRing.Vertices.Add(new Point(0, 0));
-            polygon.ExteriorRing.Vertices.Add(new Point(0, 10000000));
-            polygon.ExteriorRing.Vertices.Add(new Point(10000000, 10000000));
-            polygon.ExteriorRing.Vertices.Add(new Point(10000000, 0));
-            polygon.ExteriorRing.Vertices.Add(new Point(0, 0));
-            var linearRing = new LinearRing();
-            linearRing.Vertices.Add(new Point(1000000, 1000000));
-            linearRing.Vertices.Add(new Point(9000000, 1000000));
-            linearRing.Vertices.Add(new Point(9000000, 9000000));
-            linearRing.Vertices.Add(new Point(1000000, 9000000));
-            linearRing.Vertices.Add(new Point(1000000, 1000000));
-            polygon.InteriorRings.Add(linearRing);
-            return polygon;
+            return new Polygon(
+                new LinearRing(new[] {
+                    new Coordinate(0, 0),
+                    new Coordinate(0, 10000000),
+                    new Coordinate(10000000, 10000000),
+                    new Coordinate(10000000, 0),
+                    new Coordinate(0, 0)
+                }),
+                new[] { new LinearRing(new [] {
+                    new Coordinate(1000000, 1000000),
+                    new Coordinate(9000000, 1000000),
+                    new Coordinate(9000000, 9000000),
+                    new Coordinate(1000000, 9000000),
+                    new Coordinate(1000000, 1000000)
+                })}
+            );
         }
 
         private static LineString CreateLineString()
         {
-            var lineString = new LineString();
-            lineString.Vertices.Add(new Point(1000000, 1000000));
-            lineString.Vertices.Add(new Point(9000000, 1000000));
-            lineString.Vertices.Add(new Point(9000000, 9000000));
-            lineString.Vertices.Add(new Point(1000000, 9000000));
-            lineString.Vertices.Add(new Point(1000000, 1000000));
-            return lineString;
+            return new LineString(new[] {
+                new Coordinate(1000000, 1000000),
+                new Coordinate(9000000, 1000000),
+                new Coordinate(9000000, 9000000),
+                new Coordinate(1000000, 9000000),
+                new Coordinate(1000000, 1000000)
+            });
         }
     }
 }

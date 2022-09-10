@@ -2,13 +2,13 @@
 
 namespace Mapsui.Fetcher
 {
-    class FetchMachine
+    public class FetchMachine // Todo: Make internal
     {
         private readonly List<FetchWorker> _worker = new();
-        
+
         public FetchMachine(IFetchDispatcher fetchDispatcher, int numberOfWorkers = 4)
         {
-            for (int i = 0; i < numberOfWorkers; i++)
+            for (var i = 0; i < numberOfWorkers; i++)
             {
                 _worker.Add(new FetchWorker(fetchDispatcher));
             }
@@ -21,7 +21,7 @@ namespace Mapsui.Fetcher
                 worker.Start();
             }
         }
-        
+
         public void Stop()
         {
             foreach (var worker in _worker)

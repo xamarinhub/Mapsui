@@ -1,4 +1,8 @@
-﻿namespace Mapsui.UI.Forms.Extensions
+﻿#if __MAUI__
+namespace Mapsui.UI.Maui.Extensions
+#else
+namespace Mapsui.UI.Forms.Extensions
+#endif
 {
     public static class ZoomLevelExtensions
     {
@@ -12,7 +16,7 @@
             if (zoomLevel < 0 || zoomLevel > 30)
                 return 0;
 
-            return 156543.03392 / System.Math.Pow(2,zoomLevel);
+            return 156543.03392 / System.Math.Pow(2, zoomLevel);
         }
     }
 }

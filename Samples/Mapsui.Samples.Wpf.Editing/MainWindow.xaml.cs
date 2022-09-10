@@ -11,20 +11,24 @@ using Mapsui.Layers;
 using Mapsui.Samples.Wpf.Editing.Editing;
 using Mapsui.Samples.Wpf.Editing.Utilities;
 using Mapsui.Logging;
-using Mapsui.Providers;
+
 using Mapsui.UI.Wpf.Extensions;
 
 namespace Mapsui.Samples.Wpf.Editing
 {
     public partial class MainWindow
     {
-        private WritableLayer _targetLayer;
-        private IEnumerable<IGeometryFeature> _tempFeatures;
-        private readonly EditManager _editManager = new EditManager();
-        private readonly EditManipulation _editManipulation = new EditManipulation();
+        // In this class we cast to GeometryFeature and this only works because we happen to know
+        // there we use only IGeometryFeatures in the writable layer. We need to cast to allow
+        // us to copy. This needs to be improved.
+
+        private WritableLayer? _targetLayer;
+        private IEnumerable<IFeature>? _tempFeatures;
+        private readonly EditManager _editManager = new();
+        private readonly EditManipulation _editManipulation = new();
         private bool _selectMode;
-        private readonly LimitedQueue<LogModel> _logMessage = new LimitedQueue<LogModel>(6);
-        
+        private readonly LimitedQueue<LogModel> _logMessage = new(6);
+
         public MainWindow()
         {
             InitializeComponent();
@@ -33,7 +37,7 @@ namespace Mapsui.Samples.Wpf.Editing
             MapControl.MouseLeftButtonDown += MapControlOnMouseLeftButtonDown;
             MapControl.MouseLeftButtonUp += MapControlOnMouseLeftButtonUp;
 
-            MapControl.Map.RotationLock = false;
+            MapControl.Map!.RotationLock = false;
             MapControl.UnSnapRotationDegrees = 30;
             MapControl.ReSnapRotationDegrees = 5;
 
@@ -41,7 +45,6 @@ namespace Mapsui.Samples.Wpf.Editing
 
             FillComboBoxWithDemoSamples();
 
-            RenderMode.SelectionChanged += RenderModeOnSelectionChanged;
             TargetLayer.SelectionChanged += TargetLayerOnSelectionChanged;
             var firstRadioButton = (RadioButton)SampleList.Children[0];
             firstRadioButton.IsChecked = true;
@@ -51,19 +54,14 @@ namespace Mapsui.Samples.Wpf.Editing
         {
             var selectedValue = ((ComboBoxItem)((ComboBox)sender).SelectedItem).Content.ToString();
 
-            if (selectedValue.ToLower().Contains("point"))
-                _targetLayer = (WritableLayer)MapControl.Map.Layers.First(l => l.Name == "PointLayer");
-            else if (selectedValue.ToLower().Contains("line"))
-                _targetLayer = (WritableLayer)MapControl.Map.Layers.First(l => l.Name == "LineLayer");
-            else if (selectedValue.ToLower().Contains("polygon"))
-                _targetLayer = (WritableLayer)MapControl.Map.Layers.First(l => l.Name == "PolygonLayer");
+            if (selectedValue == "Layer 1")
+                _targetLayer = MapControl.Map?.Layers.First(l => l.Name == "Layer 1") as WritableLayer;
+            else if (selectedValue == "Layer 2")
+                _targetLayer = MapControl.Map?.Layers.First(l => l.Name == "Layer 2") as WritableLayer;
+            else if (selectedValue == "Layer 3")
+                _targetLayer = MapControl.Map?.Layers.First(l => l.Name == "Layer 3") as WritableLayer;
             else
                 throw new Exception("Unknown ComboBox item");
-        }
-
-        private void RenderModeOnSelectionChanged(object sender, SelectionChangedEventArgs selectionChangedEventArgs)
-        {
-            // todo: remove entire dropdown
         }
 
         private void FillComboBoxWithDemoSamples()
@@ -89,14 +87,13 @@ namespace Mapsui.Samples.Wpf.Editing
                 Margin = new Thickness(4)
             };
 
-            radioButton.Click += (s, a) =>
-            {
-                MapControl.Map.Layers.Clear();
+            radioButton.Click += (_, _) => {
+                MapControl!.Map?.Layers.Clear();
                 MapControl.Map = sample.Value();
- 
-                LayerList.Initialize(MapControl.Map.Layers);
-                InitializeZoomSlider(MapControl.Map.Resolutions);
-                if (MapControl.Map.Layers.Any(l => l.Name.ToLower().Contains("edit"))) InitializeEditSetup();
+
+                LayerList.Initialize(MapControl!.Map.Layers);
+                InitializeZoomSlider(MapControl!.Map.Resolutions);
+                if (MapControl!.Map.Layers.Any(l => l.Name.ToLower().Contains("edit"))) InitializeEditSetup();
             };
             return radioButton;
         }
@@ -115,11 +112,10 @@ namespace Mapsui.Samples.Wpf.Editing
             ZoomSlider.TickPlacement = TickPlacement.BottomRight;
             ZoomSlider.EndInit();
         }
-        
-        private void LogMethod(LogLevel logLevel, string message, Exception exception)
+
+        private void LogMethod(LogLevel logLevel, string? message, Exception? exception)
         {
-            Dispatcher.Invoke(() =>
-            {
+            Dispatcher.BeginInvoke(() => {
                 _logMessage.Enqueue(new LogModel { Exception = exception, LogLevel = logLevel, Message = message });
                 return LogTextBox.Text = ToMultiLineString(_logMessage);
             });
@@ -142,45 +138,46 @@ namespace Mapsui.Samples.Wpf.Editing
         private void RotationSliderChanged(object sender, RoutedPropertyChangedEventArgs<double> args)
         {
             var percent = RotationSlider.Value / (RotationSlider.Maximum - RotationSlider.Minimum);
-            MapControl.Navigator.RotateTo(percent * 360);
+            MapControl.Navigator?.RotateTo(percent * 360);
             MapControl.Refresh();
         }
 
         private void ZoomSliderChanged(object sender, RoutedPropertyChangedEventArgs<double> args)
         {
-            MapControl.Navigator.ZoomTo(MapControl.Map.Resolutions[(int)args.NewValue]);
+            if (MapControl.Map != null)
+                MapControl.Navigator?.ZoomTo(MapControl.Map.Resolutions[(int)args.NewValue]);
         }
 
         private void InitializeEditSetup()
         {
-            _editManager.Layer = (WritableLayer)MapControl.Map.Layers.First(l => l.Name == "EditLayer");
-            _targetLayer = (WritableLayer)MapControl.Map.Layers.First(l => l.Name == "PolygonLayer");
+            _editManager.Layer = (WritableLayer)MapControl.Map!.Layers.First(l => l.Name == "EditLayer");
+            _targetLayer = (WritableLayer)MapControl.Map.Layers.First(l => l.Name == "Layer 3");
 
             // Load the polygon layer on startup so you can start modifying right away
             _editManager.Layer.AddRange(_targetLayer.GetFeatures().Copy());
             _targetLayer.Clear();
 
             _editManager.EditMode = EditMode.Modify;
-            Loaded += (sender, args) =>
-            {
-                MapControl.Navigator.NavigateTo(_editManager.Layer.Envelope.Grow(_editManager.Layer.Envelope.Width * 0.2));
+            Loaded += (_, _) => {
+                var extent = _editManager.Layer.Extent!.Grow(_editManager.Layer.Extent.Width * 0.2);
+                MapControl.Navigator?.NavigateTo(extent);
             };
         }
 
         private void AddPoint_OnClick(object sender, RoutedEventArgs args)
         {
-            IEnumerable<IGeometryFeature> features = _targetLayer.GetFeatures().Copy();
+            var features = _targetLayer?.GetFeatures().Copy() ?? Array.Empty<IFeature>();
 
-			foreach (var feature in features)
-	        {
-		        feature.RenderedGeometry.Clear();
-	        }
+            foreach (var feature in features)
+            {
+                feature.RenderedGeometry.Clear();
+            }
 
-			_tempFeatures = new List<IGeometryFeature>(features);
+            _tempFeatures = new List<IFeature>(features);
 
             _editManager.EditMode = EditMode.AddPoint;
         }
-        
+
         private void Modify_OnClick(object sender, RoutedEventArgs args)
         {
             _editManager.EditMode = EditMode.Modify;
@@ -188,8 +185,8 @@ namespace Mapsui.Samples.Wpf.Editing
 
         private void Save_OnClick(object sender, RoutedEventArgs args)
         {
-            _targetLayer.AddRange(_editManager.Layer.GetFeatures().Copy());
-            _editManager.Layer.Clear();
+            _targetLayer?.AddRange(_editManager.Layer?.GetFeatures().Copy() ?? new List<IFeature>());
+            _editManager.Layer?.Clear();
 
             MapControl.RefreshGraphics();
         }
@@ -206,28 +203,28 @@ namespace Mapsui.Samples.Wpf.Editing
 
         private void AddLine_OnClick(object sender, RoutedEventArgs args)
         {
-            IEnumerable<IGeometryFeature> features = _targetLayer.GetFeatures().Copy();
+            var features = _targetLayer?.GetFeatures().Copy() ?? Array.Empty<IFeature>();
 
-			foreach (var feature in features)
-	        {
-		        feature.RenderedGeometry.Clear();
-	        }
+            foreach (var feature in features)
+            {
+                feature.RenderedGeometry.Clear();
+            }
 
-			_tempFeatures = new List<IGeometryFeature>(features);
+            _tempFeatures = new List<IFeature>(features);
 
             _editManager.EditMode = EditMode.AddLine;
         }
 
         private void AddPolygon_OnClick(object sender, RoutedEventArgs args)
         {
-			IEnumerable<IGeometryFeature> features = _targetLayer.GetFeatures().Copy();
+            var features = _targetLayer?.GetFeatures().Copy() ?? Array.Empty<IFeature>();
 
-			foreach (var feature in features)
-	        {
-		        feature.RenderedGeometry.Clear();
-	        }
+            foreach (var feature in features)
+            {
+                feature.RenderedGeometry.Clear();
+            }
 
-			_tempFeatures = new List<IGeometryFeature>(features);
+            _tempFeatures = new List<IFeature>(features);
 
             _editManager.EditMode = EditMode.AddPolygon;
         }
@@ -240,50 +237,50 @@ namespace Mapsui.Samples.Wpf.Editing
         {
             _editManager.EditMode = EditMode.Scale;
         }
-        
+
         private void Load_OnClick(object sender, RoutedEventArgs args)
         {
-	        IEnumerable<IGeometryFeature> features = _targetLayer.GetFeatures().Copy();
+            var features = _targetLayer?.GetFeatures().Copy() ?? Array.Empty<IFeature>();
 
-			foreach (var feature in features)
-	        {
-		        feature.RenderedGeometry.Clear();
-	        }
+            foreach (var feature in features)
+            {
+                feature.RenderedGeometry.Clear();
+            }
 
-			_tempFeatures = new List<IGeometryFeature>(features);
+            _tempFeatures = new List<IFeature>(features);
 
-			_editManager.Layer.AddRange(features);
-			_targetLayer.Clear();
+            _editManager.Layer?.AddRange(features);
+            _targetLayer?.Clear();
 
             MapControl.RefreshGraphics();
         }
 
-	    private void Cancel_OnClick(object sender, RoutedEventArgs args)
-	    {
+        private void Cancel_OnClick(object sender, RoutedEventArgs args)
+        {
             if (_targetLayer != null && _tempFeatures != null)
-		    {
-			    _targetLayer.Clear(); _targetLayer.AddRange(_tempFeatures.Copy());
-			    MapControl.RefreshGraphics();
-			}
+            {
+                _targetLayer.Clear(); _targetLayer.AddRange(_tempFeatures.Copy());
+                MapControl.RefreshGraphics();
+            }
 
-		    _editManager.Layer.Clear();
+            _editManager.Layer?.Clear();
 
-		    MapControl.RefreshGraphics();
+            MapControl.RefreshGraphics();
 
-		    _editManager.EditMode = EditMode.None;
+            _editManager.EditMode = EditMode.None;
 
-			_tempFeatures = null;
-	    }
+            _tempFeatures = null;
+        }
 
         private void Delete_OnClick(object sender, RoutedEventArgs args)
         {
             if (_selectMode)
             {
-                var selectedFeatures = _editManager.Layer.GetFeatures().Where(f => (bool?) f["Selected"] == true);
+                var selectedFeatures = _editManager.Layer?.GetFeatures().Where(f => (bool?)f["Selected"] == true) ?? Array.Empty<IFeature>();
 
                 foreach (var selectedFeature in selectedFeatures)
                 {
-                    _editManager.Layer.TryRemove(selectedFeature);
+                    _editManager.Layer?.TryRemove(selectedFeature);
                 }
                 MapControl.RefreshGraphics();
             }
@@ -309,13 +306,14 @@ namespace Mapsui.Samples.Wpf.Editing
 
         private void MapControlOnMouseLeftButtonUp(object sender, MouseButtonEventArgs args)
         {
-            MapControl.Map.PanLock = _editManipulation.Manipulate(MouseState.Up,
+            if (MapControl.Map != null)
+                MapControl.Map.PanLock = _editManipulation.Manipulate(MouseState.Up,
                 args.GetPosition(MapControl).ToMapsui(), _editManager, MapControl);
 
             if (_selectMode)
             {
                 var infoArgs = MapControl.GetMapInfo(args.GetPosition(MapControl).ToMapsui());
-                if (infoArgs.Feature != null)
+                if (infoArgs?.Feature != null)
                 {
                     var currentValue = (bool?)infoArgs.Feature["Selected"] == true;
                     infoArgs.Feature["Selected"] = !currentValue; // invert current value
@@ -325,6 +323,9 @@ namespace Mapsui.Samples.Wpf.Editing
 
         private void MapControlOnMouseLeftButtonDown(object sender, MouseButtonEventArgs args)
         {
+            if (MapControl.Map == null)
+                return;
+
             if (args.ClickCount > 1)
             {
                 MapControl.Map.PanLock = _editManipulation.Manipulate(MouseState.DoubleClick,

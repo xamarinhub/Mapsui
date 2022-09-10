@@ -1,17 +1,19 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
-using Mapsui.Geometries;
 using Mapsui.Layers;
+using Mapsui.Nts;
 using Mapsui.Providers;
 using Mapsui.Styles;
+using Mapsui.Tiling;
 using Mapsui.UI;
-using Mapsui.Utilities;
+using NetTopologySuite.Geometries;
 
 // ReSharper disable UnusedAutoPropertyAccessor.Local
+#pragma warning disable CS8670 // Object or collection initializer implicitly dereferences possibly null member.
+#pragma warning disable IDISP004 // Don't ignore created IDisposable
 
 namespace Mapsui.Samples.Common.Maps
 {
-    public class ManyVerticesSample : ISample
+    public class ManyVerticesSample : IMapControlSample
     {
         public string Name => "Many Vertices";
         public string Category => "Special";
@@ -27,7 +29,8 @@ namespace Mapsui.Samples.Common.Maps
 
             map.Layers.Add(OpenStreetMap.CreateTileLayer());
             map.Layers.Add(new RasterizingLayer(CreatePointLayer(), pixelDensity: pixelDensity));
-            map.Home = n => n.NavigateTo(map.Layers[1].Envelope.Grow(map.Layers[1].Envelope.Width * 0.25));
+            var extent = map.Layers[1].Extent!.Grow(map.Layers[1].Extent!.Width * 0.25);
+            map.Home = n => n.NavigateTo(extent);
             return map;
         }
 
@@ -37,39 +40,44 @@ namespace Mapsui.Samples.Common.Maps
             {
                 Name = "Points",
                 IsMapInfoLayer = true,
-                DataSource = new MemoryProvider<IGeometryFeature>(GetFeature())
+                Features = new List<IFeature>() { GetFeature() }
             };
         }
 
-        private static IGeometryFeature GetFeature()
+        private static IFeature GetFeature()
         {
-            var feature = new Feature();
-
-            var startPoint = new Point(1623484, 7652571);
-
-            var points = new List<Point>();
-
-            for (int i = 0; i < 10000; i++)
-            {
-                points.Add(new Point(startPoint.X + i, startPoint.Y + i));
-            }
-
+            var lineString = CreateLineStringWithManyVertices();
+            var feature = new GeometryFeature();
             AddStyles(feature);
-            feature.Geometry = new LineString(points);
-            feature["Name"] = $"LineString with {points.Count()} vertices";
+            feature.Geometry = lineString;
+            feature["Name"] = $"LineString with {lineString.Coordinates.Length} vertices";
             return feature;
         }
 
-        private static void AddStyles(Feature feature)
+        private static LineString CreateLineStringWithManyVertices()
+        {
+            var startPoint = new Coordinate(1623484, 7652571);
+
+            var points = new List<Coordinate>();
+
+            for (var i = 0; i < 10000; i++)
+            {
+                points.Add(new Coordinate(startPoint.X + i, startPoint.Y + i));
+            }
+
+            return new LineString(points.ToArray());
+        }
+
+        private static void AddStyles(IFeature feature)
         {
             // route outline style
-            VectorStyle vsout = new VectorStyle
+            var vsout = new VectorStyle
             {
                 Opacity = 0.5f,
                 Line = new Pen(Color.White, 10f),
             };
 
-            VectorStyle vs = new VectorStyle
+            var vs = new VectorStyle
             {
                 Fill = null,
                 Outline = null,

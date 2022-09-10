@@ -1,19 +1,17 @@
-using System.Linq;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using Mapsui.Extensions;
+using System.Linq;
 using Mapsui.Fetcher;
-using Mapsui.Geometries;
 using Mapsui.Logging;
-using Mapsui.Providers;
 using Mapsui.Rendering;
+using Mapsui.Styles;
 
 namespace Mapsui.Layers
 {
-    public class RasterizingLayer : BaseLayer, IAsyncDataFetcher
+    public class RasterizingLayer : BaseLayer, IAsyncDataFetcher, ISourceLayer
     {
-        private readonly ConcurrentStack<IGeometryFeature> _cache;
+        private readonly ConcurrentStack<RasterFeature> _cache;
         private readonly ILayer _layer;
         private readonly bool _onlyRerasterizeIfOutsideOverscan;
         private readonly double _overscan;
@@ -21,12 +19,11 @@ namespace Mapsui.Layers
         private readonly float _pixelDensity;
         private readonly object _syncLock = new();
         private bool _busy;
-        private Viewport _currentViewport;
-        private BoundingBox _extent;
+        private Viewport? _currentViewport;
         private bool _modified;
-        private IEnumerable<IFeature> _previousFeatures;
-        private IRenderer _rasterizer;
-        private double _resolution;
+        private IEnumerable<IFeature>? _previousFeatures;
+        private readonly IRenderer _rasterizer = DefaultRendererFactory.Create();
+        private FetchInfo? _fetchInfo;
         public Delayer Delayer { get; } = new();
         private readonly Delayer _rasterizeDelayer = new();
 
@@ -48,7 +45,7 @@ namespace Mapsui.Layers
             ILayer layer,
             int delayBeforeRasterize = 1000,
             double renderResolutionMultiplier = 1,
-            IRenderer rasterizer = null,
+            IRenderer? rasterizer = null,
             double overscanRatio = 1,
             bool onlyRerasterizeIfOutsideOverscan = false,
             float pixelDensity = 1)
@@ -59,25 +56,27 @@ namespace Mapsui.Layers
             _layer = layer;
             Name = layer.Name;
             _renderResolutionMultiplier = renderResolutionMultiplier;
-            _rasterizer = rasterizer;
-            _cache = new ConcurrentStack<IGeometryFeature>();
+            if (rasterizer != null) _rasterizer = rasterizer;
+            _cache = new ConcurrentStack<RasterFeature>();
             _overscan = overscanRatio;
             _onlyRerasterizeIfOutsideOverscan = onlyRerasterizeIfOutsideOverscan;
             _pixelDensity = pixelDensity;
             _layer.DataChanged += LayerOnDataChanged;
             Delayer.StartWithDelay = true;
             Delayer.MillisecondsToWait = delayBeforeRasterize;
+            Style = new RasterStyle(); // default raster style
         }
 
-        public override BoundingBox Envelope => _layer.Envelope;
+        public override MRect? Extent => _layer.Extent;
 
-        public ILayer ChildLayer => _layer;
+        public ILayer SourceLayer => _layer;
 
         private void LayerOnDataChanged(object sender, DataChangedEventArgs dataChangedEventArgs)
         {
             if (!Enabled) return;
-            if (MinVisible > _resolution) return;
-            if (MaxVisible < _resolution) return;
+            if (_fetchInfo == null) return;
+            if (MinVisible > _fetchInfo.Resolution) return;
+            if (MaxVisible < _fetchInfo.Resolution) return;
             if (_busy) return;
 
             _modified = true;
@@ -97,22 +96,21 @@ namespace Mapsui.Layers
             {
                 try
                 {
-                    if (double.IsNaN(_resolution) || _resolution <= 0) return;
-                    if (_extent.Width <= 0 || _extent.Height <= 0) return;
-                    var viewport = CreateViewport(_extent, _resolution, _renderResolutionMultiplier, _overscan);
+                    if (_fetchInfo == null) return;
+                    if (double.IsNaN(_fetchInfo.Resolution) || _fetchInfo.Resolution <= 0) return;
+                    if (_fetchInfo.Extent == null || _fetchInfo.Extent?.Width <= 0 || _fetchInfo.Extent?.Height <= 0) return;
+                    var viewport = CreateViewport(_fetchInfo.Extent!, _fetchInfo.Resolution, _renderResolutionMultiplier, _overscan);
 
                     _currentViewport = viewport;
 
-                    _rasterizer ??= DefaultRendererFactory.Create();
-
-                    var bitmapStream = _rasterizer.RenderToBitmapStream(viewport, new[] { _layer }, pixelDensity: _pixelDensity);
+                    using var bitmapStream = _rasterizer.RenderToBitmapStream(viewport, new[] { _layer }, pixelDensity: _pixelDensity);
                     RemoveExistingFeatures();
 
                     if (bitmapStream != null)
                     {
                         _cache.Clear();
-                        var features = new IGeometryFeature[1];
-                        features[0] = new Feature {Geometry = new Raster(bitmapStream, viewport.Extent)};
+                        var features = new RasterFeature[1];
+                        features[0] = new RasterFeature(new MRaster(bitmapStream.ToArray(), viewport.Extent));
                         _cache.PushRange(features);
 #if DEBUG
                         Logger.Log(LogLevel.Debug, $"Memory after rasterizing layer {GC.GetTotalMemory(true):N0}");
@@ -121,7 +119,8 @@ namespace Mapsui.Layers
                         OnDataChanged(new DataChangedEventArgs());
                     }
 
-                    if (_modified) Delayer.ExecuteDelayed(() => _layer.RefreshData(_extent.Copy(), _resolution, ChangeType.Discrete));
+                    if (_modified && _layer is IAsyncDataFetcher asyncDataFetcher) 
+                            Delayer.ExecuteDelayed(() => asyncDataFetcher.RefreshData(_fetchInfo));
                 }
                 finally
                 {
@@ -142,11 +141,8 @@ namespace Mapsui.Layers
 
         private static void DisposeRenderedGeometries(IEnumerable<IFeature> features)
         {
-            foreach (var feature in features.Cast<Feature>())
+            foreach (var feature in features.Cast<RasterFeature>())
             {
-                var raster = feature.Geometry as Raster;
-                raster?.Data?.Dispose();
-
                 foreach (var key in feature.RenderedGeometry.Keys)
                 {
                     var disposable = feature.RenderedGeometry[key] as IDisposable;
@@ -157,16 +153,16 @@ namespace Mapsui.Layers
 
         public static double SymbolSize { get; set; } = 64;
 
-        public override IEnumerable<IFeature> GetFeaturesInView(BoundingBox box, double resolution)
+        public override IEnumerable<IFeature> GetFeatures(MRect box, double resolution)
         {
             if (box == null) throw new ArgumentNullException(nameof(box));
 
             var features = _cache.ToArray();
 
             // Use a larger extent so that symbols partially outside of the extent are included
-            var grownBox = box.Grow(resolution * SymbolSize * 0.5);
+            var biggerBox = box.Grow(resolution * SymbolSize * 0.5);
 
-            return features.Where(f => f.Geometry != null && f.Geometry.BoundingBox.Intersects(grownBox)).ToList();
+            return features.Where(f => f.Raster != null && f.Raster.Intersects(biggerBox)).ToList();
         }
 
         public void AbortFetch()
@@ -174,24 +170,25 @@ namespace Mapsui.Layers
             if (_layer is IAsyncDataFetcher asyncLayer) asyncLayer.AbortFetch();
         }
 
-        public override void RefreshData(BoundingBox extent, double resolution, ChangeType changeType)
+        public void RefreshData(FetchInfo fetchInfo)
         {
-            var newViewport = CreateViewport(extent, resolution, _renderResolutionMultiplier, 1);
+            if (fetchInfo.Extent == null)
+                return;
+            var newViewport = CreateViewport(fetchInfo.Extent, fetchInfo.Resolution, _renderResolutionMultiplier, 1);
 
             if (!Enabled) return;
-            if (MinVisible > resolution) return;
-            if (MaxVisible < resolution) return;
+            if (MinVisible > fetchInfo.Resolution) return;
+            if (MaxVisible < fetchInfo.Resolution) return;
 
             if (!_onlyRerasterizeIfOutsideOverscan ||
                 (_currentViewport == null) ||
-                // ReSharper disable once CompareOfFloatsByEqualityOperator
                 (_currentViewport.Resolution != newViewport.Resolution) ||
                 !_currentViewport.Extent.Contains(newViewport.Extent))
             {
-                _extent = extent;
-                _resolution = resolution;
-                if (_layer is IAsyncDataFetcher)
-                    Delayer.ExecuteDelayed(() => _layer.RefreshData(extent.Copy(), resolution, changeType));
+                // Explicitly set the change type to discrete for rasterization
+                _fetchInfo = new FetchInfo(fetchInfo.Extent, fetchInfo.Resolution, fetchInfo.CRS);
+                if (_layer is IAsyncDataFetcher asyncDataFetcher)
+                    Delayer.ExecuteDelayed(() => asyncDataFetcher.RefreshData(_fetchInfo));
                 else
                     Delayer.ExecuteDelayed(Rasterize);
             }
@@ -202,14 +199,15 @@ namespace Mapsui.Layers
             if (_layer is IAsyncDataFetcher asyncLayer) asyncLayer.ClearCache();
         }
 
-        private static Viewport CreateViewport(BoundingBox extent, double resolution, double renderResolutionMultiplier,
+        public static Viewport CreateViewport(MRect extent, double resolution, double renderResolutionMultiplier,
             double overscan)
         {
             var renderResolution = resolution / renderResolutionMultiplier;
             return new Viewport
             {
                 Resolution = renderResolution,
-                Center = extent.Centroid,
+                CenterX = extent.Centroid.X,
+                CenterY = extent.Centroid.Y,
                 Width = extent.Width * overscan / renderResolution,
                 Height = extent.Height * overscan / renderResolution
             };

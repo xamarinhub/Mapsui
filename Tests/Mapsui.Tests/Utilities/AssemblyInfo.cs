@@ -10,10 +10,8 @@ namespace Mapsui.Tests.Utilities
         {
             get
             {
-                var codeBase = Assembly.GetExecutingAssembly().CodeBase;
-                var uri = new UriBuilder(codeBase);
-                var path = Uri.UnescapeDataString(uri.Path);
-                return Path.GetDirectoryName(path);
+                var path = Assembly.GetExecutingAssembly().Location;
+                return Path.GetDirectoryName(path)!;
             }
         }
     }

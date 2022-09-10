@@ -1,6 +1,10 @@
 ﻿using System;
 
+#if __MAUI__
+namespace Mapsui.UI.Maui
+#else
 namespace Mapsui.UI.Forms
+#endif
 {
     public sealed class MapClickedEventArgs : EventArgs
     {
@@ -20,7 +24,7 @@ namespace Mapsui.UI.Forms
         /// <value><c>true</c> if handled; otherwise, <c>false</c>.</value>
         public bool Handled { get; set; } = false;
 
-        internal MapClickedEventArgs(Position point, int numOfTaps)
+        public MapClickedEventArgs(Position point, int numOfTaps)
         {
             Point = point;
             NumOfTaps = numOfTaps;

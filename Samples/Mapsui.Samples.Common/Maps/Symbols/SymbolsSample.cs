@@ -1,13 +1,14 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
-using Mapsui.Geometries;
 using Mapsui.Layers;
 using Mapsui.Providers;
 using Mapsui.Samples.Common.Helpers;
 using Mapsui.Styles;
 using Mapsui.UI;
 using Mapsui.Utilities;
+using Mapsui.Extensions;
+using Mapsui.Tiling;
+using System.Threading.Tasks;
 
 namespace Mapsui.Samples.Common.Maps
 {
@@ -16,46 +17,38 @@ namespace Mapsui.Samples.Common.Maps
         public string Name => "Symbols";
         public string Category => "Symbols";
 
-        public void Setup(IMapControl mapControl)
-        {
-            mapControl.Map = CreateMap();
-        }
-
-        public static Map CreateMap()
+        public Task<Map> CreateMapAsync()
         {
             var map = new Map();
 
             map.Layers.Add(OpenStreetMap.CreateTileLayer());
-            map.Layers.Add(CreateStylesLayer(map.Envelope));
-            
-            return map;
+            map.Layers.Add(CreateStylesLayer(map.Extent));
+
+            return Task.FromResult(map);
         }
 
-        private static ILayer CreateStylesLayer(BoundingBox envelope)
+        private static ILayer CreateStylesLayer(MRect? envelope)
         {
             return new MemoryLayer
             {
                 Name = "Styles Layer",
-                DataSource = CreateMemoryProviderWithDiverseSymbols(envelope, 25),
+                Features = CreateDiverseFeatures(RandomPointGenerator.GenerateRandomPoints(envelope, 25)),
                 Style = null,
                 IsMapInfoLayer = true
             };
         }
 
-        public static MemoryProvider<IGeometryFeature> CreateMemoryProviderWithDiverseSymbols(BoundingBox envelope, int count = 100)
+        private static IEnumerable<IFeature> CreateDiverseFeatures(IEnumerable<MPoint> randomPoints)
         {
-            
-            return new MemoryProvider<IGeometryFeature>(CreateDiverseFeatures(RandomPointHelper.GenerateRandomPoints(envelope, count)));
-        }
-
-        private static IEnumerable<IGeometryFeature> CreateDiverseFeatures(IEnumerable<IGeometry> randomPoints)
-        {
-            var features = new List<IGeometryFeature>();
+            var features = new List<IFeature>();
             var counter = 0;
             var styles = CreateDiverseStyles().ToList();
             foreach (var point in randomPoints)
             {
-                var feature = new Feature { Geometry = point, ["Label"] = counter.ToString() };
+                var feature = new PointFeature(point)
+                {
+                    ["Label"] = counter.ToString()
+                };
 
                 feature.Styles.Add(styles[counter]);
                 feature.Styles.Add(SmalleDot());
@@ -78,48 +71,40 @@ namespace Mapsui.Samples.Common.Maps
             const int diameter = 16;
             return new List<IStyle>
             {
-                new SymbolStyle {SymbolScale = 0.8, SymbolOffset = new Offset(0,0), SymbolType = SymbolType.Rectangle},
-                new SymbolStyle {SymbolScale = 0.6, SymbolOffset = new Offset(diameter,diameter), SymbolType = SymbolType.Rectangle, Fill = new Brush(Color.Red)},
-                new SymbolStyle {SymbolScale = 1, SymbolOffset = new Offset(diameter,-diameter), SymbolType = SymbolType.Rectangle},
-                new SymbolStyle {SymbolScale = 1, SymbolOffset = new Offset(-diameter,-diameter), SymbolType = SymbolType.Rectangle},
-                new SymbolStyle {SymbolScale = 0.8, SymbolOffset = new Offset(0,0)},
+                new SymbolStyle {SymbolScale = 0.8, SymbolOffset = new Offset(0, 0), SymbolType = SymbolType.Rectangle},
+                new SymbolStyle {SymbolScale = 0.6, SymbolOffset = new Offset(diameter, diameter), SymbolType = SymbolType.Rectangle, Fill = new Brush(Color.Red)},
+                new SymbolStyle {SymbolScale = 1, SymbolOffset = new Offset(diameter, -diameter), SymbolType = SymbolType.Rectangle},
+                new SymbolStyle {SymbolScale = 1, SymbolOffset = new Offset(-diameter, -diameter), SymbolType = SymbolType.Rectangle},
+                new SymbolStyle {SymbolScale = 0.8, SymbolOffset = new Offset(0, 0)},
                 new SymbolStyle {SymbolScale = 1.2, SymbolOffset = new Offset(diameter, 0)},
                 new SymbolStyle {SymbolScale = 1, SymbolOffset = new Offset(0, diameter)},
                 new SymbolStyle {SymbolScale = 1, SymbolOffset = new Offset(diameter, diameter)},
-                CreateBitmapStyle("Mapsui.Samples.Common.Images.ic_place_black_24dp.png", 0.7),
-                CreateBitmapStyle("Mapsui.Samples.Common.Images.ic_place_black_24dp.png", 0.8),
-                CreateBitmapStyle("Mapsui.Samples.Common.Images.ic_place_black_24dp.png", 0.9),
-                CreateBitmapStyle("Mapsui.Samples.Common.Images.ic_place_black_24dp.png", 1.0),
-                CreateSvgStyle("Mapsui.Samples.Common.Images.Pin.svg", 0.7),
-                CreateSvgStyle("Mapsui.Samples.Common.Images.Pin.svg", 0.8),
-                CreateSvgStyle("Mapsui.Samples.Common.Images.Ghostscript_Tiger.svg", 0.05),
-                CreateSvgStyle("Mapsui.Samples.Common.Images.Ghostscript_Tiger.svg", 0.1),
+                CreateBitmapStyle("Images.ic_place_black_24dp.png", 0.7),
+                CreateBitmapStyle("Images.ic_place_black_24dp.png", 0.8),
+                CreateBitmapStyle("Images.ic_place_black_24dp.png", 0.9),
+                CreateBitmapStyle("Images.ic_place_black_24dp.png", 1.0),
+                CreateSvgStyle("Images.Pin.svg", 0.7),
+                CreateSvgStyle("Images.Pin.svg", 0.8),
+                CreateSvgStyle("Images.Ghostscript_Tiger.svg", 0.05),
+                CreateSvgStyle("Images.Ghostscript_Tiger.svg", 0.1),
             };
         }
 
         private static SymbolStyle CreateBitmapStyle(string embeddedResourcePath, double scale)
         {
-            var bitmapId = GetBitmapIdForEmbeddedResource(embeddedResourcePath);
+            var bitmapId = typeof(SymbolsSample).LoadBitmapId(embeddedResourcePath);
             return new SymbolStyle { BitmapId = bitmapId, SymbolScale = scale, SymbolOffset = new Offset(0, 32) };
         }
 
         private static SymbolStyle CreateSvgStyle(string embeddedResourcePath, double scale)
         {
-            var bitmapId = GetBitmapIdForEmbeddedResource(embeddedResourcePath);
-            return new SymbolStyle { BitmapId = bitmapId, SymbolScale = scale, SymbolOffset = new Offset(0.0, 0.5, true) };
+            var bitmapId = typeof(SymbolsSample).LoadSvgId(embeddedResourcePath);
+            return new SymbolStyle { BitmapId = bitmapId, SymbolScale = scale, SymbolOffset = new RelativeOffset(0.0, 0.5) };
         }
 
-        private static int GetBitmapIdForEmbeddedResource(string imagePath)
+        private static IFeature CreatePointWithStackedStyles()
         {
-            var assembly = typeof(PointsSample).GetTypeInfo().Assembly;
-            var image = assembly.GetManifestResourceStream(imagePath);
-            var bitmapId = BitmapRegistry.Instance.Register(image);
-            return bitmapId;
-        }
-
-        private static IGeometryFeature CreatePointWithStackedStyles()
-        {
-            var feature = new Feature { Geometry = new Point(5000000, -5000000) };
+            var feature = new PointFeature(new MPoint(5000000, -5000000));
 
             feature.Styles.Add(new SymbolStyle
             {
@@ -148,7 +133,5 @@ namespace Mapsui.Samples.Common.Maps
 
             return feature;
         }
-
-
     }
 }

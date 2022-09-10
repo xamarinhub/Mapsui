@@ -10,18 +10,18 @@ namespace Mapsui.Layers
     public class LayerCollection : IEnumerable<ILayer>
     {
         private ConcurrentQueue<ILayer> _layers = new();
-        
+
         public delegate void LayerRemovedEventHandler(ILayer layer);
         public delegate void LayerAddedEventHandler(ILayer layer);
         public delegate void LayerMovedEventHandler(ILayer layer);
 
         public delegate void LayerCollectionChangedEventHandler(object sender, LayerCollectionChangedEventArgs args);
 
-        public event LayerRemovedEventHandler LayerRemoved;
-        public event LayerAddedEventHandler LayerAdded;
-        public event LayerMovedEventHandler LayerMoved;
+        public event LayerRemovedEventHandler? LayerRemoved;
+        public event LayerAddedEventHandler? LayerAdded;
+        public event LayerMovedEventHandler? LayerMoved;
 
-        public event LayerCollectionChangedEventHandler Changed;
+        public event LayerCollectionChangedEventHandler? Changed;
 
         public int Count => _layers.Count;
 
@@ -31,7 +31,7 @@ namespace Mapsui.Layers
         {
             return _layers.GetEnumerator();
         }
-        
+
         IEnumerator IEnumerable.GetEnumerator()
         {
             return _layers.GetEnumerator();
@@ -90,7 +90,7 @@ namespace Mapsui.Layers
 
             _layers = new ConcurrentQueue<ILayer>(copy);
             OnLayerMoved(layer);
-            OnChanged(null, null, new [] { layer });
+            OnChanged(null, null, new[] { layer });
         }
 
         public void Insert(int index, params ILayer[] layers)
@@ -118,7 +118,7 @@ namespace Mapsui.Layers
 
             return success;
         }
-        
+
         public bool Remove(Func<ILayer, bool> predicate)
         {
             var copyLayers = _layers.ToArray().Where(predicate).ToArray();
@@ -130,8 +130,8 @@ namespace Mapsui.Layers
 
         public void Modify(IEnumerable<ILayer> layersToRemove, IEnumerable<ILayer> layersToAdd)
         {
-            var copyLayersToRemove = layersToRemove?.ToArray();
-            var copyLayersToAdd = layersToAdd?.ToArray();
+            var copyLayersToRemove = layersToRemove.ToArray();
+            var copyLayersToAdd = layersToAdd.ToArray();
 
             RemoveLayers(copyLayersToRemove);
             AddLayers(copyLayersToAdd);
@@ -142,7 +142,7 @@ namespace Mapsui.Layers
         public void Modify(Func<ILayer, bool> removePredicate, IEnumerable<ILayer> layersToAdd)
         {
             var copyLayersToRemove = _layers.ToArray().Where(removePredicate).ToArray();
-            var copyLayersToAdd = layersToAdd?.ToArray();
+            var copyLayersToAdd = layersToAdd.ToArray();
 
             RemoveLayers(copyLayersToRemove);
             AddLayers(copyLayersToAdd);
@@ -152,7 +152,7 @@ namespace Mapsui.Layers
 
         private void AddLayers(ILayer[] layers)
         {
-            if (layers == null || !layers.Any()) 
+            if (layers == null || !layers.Any())
                 throw new ArgumentException("Layers cannot be null or empty");
 
             foreach (var layer in layers)
@@ -201,7 +201,7 @@ namespace Mapsui.Layers
             LayerMoved?.Invoke(layer);
         }
 
-        private void OnChanged(IEnumerable<ILayer> added, IEnumerable<ILayer> removed, IEnumerable<ILayer> moved = null)
+        private void OnChanged(IEnumerable<ILayer>? added, IEnumerable<ILayer>? removed, IEnumerable<ILayer>? moved = null)
         {
             Changed?.Invoke(this, new LayerCollectionChangedEventArgs(added, removed, moved));
         }

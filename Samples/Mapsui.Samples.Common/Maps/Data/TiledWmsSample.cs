@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Linq;
+using System.Threading.Tasks;
 using BruTile;
+using BruTile.Cache;
 using BruTile.Predefined;
 using BruTile.Web;
 using BruTile.Wmsc;
 using Mapsui.Layers;
+using Mapsui.Tiling.Layers;
 using Mapsui.UI;
-using Attribution = BruTile.Attribution;
 
 namespace Mapsui.Samples.Common.Maps
 {
@@ -17,22 +19,18 @@ namespace Mapsui.Samples.Common.Maps
     {
         public string Name => "4 WMS called tiled";
         public string Category => "Data";
+        public static IPersistentCache<byte[]>? DefaultCache { get; set; }
 
-        public void Setup(IMapControl mapControl)
-        {
-            mapControl.Map = CreateMap();
-        }
-
-        public static Map CreateMap()
+        public Task<Map> CreateMapAsync()
         {
             var map = new Map();
             map.Layers.Add(CreateLayer());
-            return map;
+            return Task.FromResult(map);
         }
 
         public static ILayer CreateLayer()
         {
-            return new TileLayer(CreateTileSource()) {Name = "Omgevingswarmte (PDOK)"};
+            return new TileLayer(CreateTileSource()) { Name = "Omgevingswarmte (PDOK)" };
         }
 
         public static ITileSource CreateTileSource()
@@ -40,8 +38,8 @@ namespace Mapsui.Samples.Common.Maps
             const string url = "http://geodata.nationaalgeoregister.nl/omgevingswarmte/wms?SERVICE=WMS&VERSION=1.1.1";
             // You need to know the schema. This can be a problem. Usally it is GlobalSphericalMercator
             var schema = new WkstNederlandSchema { Format = "image/png", Srs = "EPSG:28992" };
-            var request = new WmscRequest(new Uri(url), schema, new[] { "koudegeslotenwkobuurt" }.ToList(), new string[0].ToList());
-            var provider = new HttpTileProvider(request);
+            var request = new WmscRequest(new Uri(url), schema, new[] { "koudegeslotenwkobuurt" }.ToList(), Array.Empty<string>().ToList());
+            var provider = new HttpTileProvider(request, DefaultCache);
             return new TileSource(provider, schema) { Name = "Omgevingswarmte (PDOK)" };
         }
     }

@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using Mapsui.Geometries;
 using Mapsui.Layers;
 using Mapsui.Providers;
 using Mapsui.Samples.Common;
@@ -8,7 +7,7 @@ using Mapsui.UI;
 
 namespace Mapsui.Tests.Common.Maps
 {
-    public class LabelSample : ISample
+    public class LabelSample : IMapControlSample
     {
         public string Name => "Label";
         public string Category => "Tests";
@@ -20,39 +19,43 @@ namespace Mapsui.Tests.Common.Maps
 
         public static Map CreateMap()
         {
+            var layer = CreateLayer();
+
             var map = new Map
             {
-                BackColor = Color.Transparent,
-                Home = n => n.NavigateTo(new Point(100, 100), 1)
+                BackColor = Color.FromString("WhiteSmoke"),
+                Home = n => n.NavigateTo(layer.Extent!.Grow(layer.Extent.Width * 2))
             };
-            map.Layers.Add(new MemoryLayer
-            {
-                Style = null,
-                DataSource = CreateProviderWithLabels(),
-                Name = "Labels"
-            });
+
+            map.Layers.Add(layer);
+
             return map;
         }
 
-        private static MemoryProvider<IGeometryFeature> CreateProviderWithLabels()
+        private static MemoryLayer CreateLayer()
         {
-            var features = new List<IGeometryFeature>
+            return new MemoryLayer
             {
-                new Feature
+                Style = null,
+                Features = CreateFeaturesWithLabels(),
+                Name = "Labels"
+            };
+        }
+
+        private static IEnumerable<IFeature> CreateFeaturesWithLabels()
+        {
+            var features = new List<IFeature>
+            {
+                new PointFeature(new MPoint(100, 100))
                 {
-                    Geometry = new Point(50, 50),
                     Styles = new[] {new VectorStyle {Fill = new Brush(Color.Gray), Outline = new Pen(Color.Black)}}
                 },
-                new Feature
+                new PointFeature(new MPoint(100, 200))
                 {
-                    Geometry = new Point(50, 150),
                     Styles = new[] {new LabelStyle {Text = "Black Text", BackColor = null}}
                 },
-                new Feature
-                {
-                    Geometry = new Point(150, 50),
-                    Styles =
-                        new[]
+                new PointFeature(new MPoint(100, 300)){
+                    Styles = new[]
                         {
                             new LabelStyle
                             {
@@ -62,9 +65,8 @@ namespace Mapsui.Tests.Common.Maps
                             }
                         }
                 },
-                new Feature
+                new PointFeature(new MPoint(300, 100))
                 {
-                    Geometry = new Point(150, 150),
                     Styles =
                         new[]
                         {
@@ -77,9 +79,8 @@ namespace Mapsui.Tests.Common.Maps
                             }
                         }
                 },
-                new Feature
+                new PointFeature(new MPoint(300, 200))
                 {
-                    Geometry = new Point(50, -50),
                     Styles = new[]
                     {
                         new LabelStyle
@@ -91,9 +92,8 @@ namespace Mapsui.Tests.Common.Maps
                         }
                     }
                 },
-                new Feature
+                new PointFeature(new MPoint(300, 300))
                 {
-                    Geometry = new Point(100, 100),
                     Styles = new[]
                     {
                         new LabelStyle
@@ -105,9 +105,38 @@ namespace Mapsui.Tests.Common.Maps
                         }
                     }
                 },
+                new PointFeature(new MPoint(250, 150))
+                {
+                    Styles = new[]
+                    {
+                        new LabelStyle
+                        {
+                            Text = "Border",
+                            BackColor = new Brush(Color.Gray),
+                            ForeColor = Color.Black,
+                            BorderColor = Color.Blue,
+                            BorderThickness = 7, // Thick borders are needed to fail test
+                        }
+                    }
+                },
+                new PointFeature(new MPoint(250, 50))
+                {
+                    Styles = new[]
+                    {
+                        new LabelStyle
+                        {
+                            Text = "Sharp corners",
+                            BackColor = new Brush(Color.Gray),
+                            ForeColor = Color.Black,
+                            BorderColor = Color.Black,
+                            BorderThickness = 7,
+                            CornerRounding = 0,
+                        }
+                    }
+                }
             };
-            var provider = new MemoryProvider<IGeometryFeature>(features);
-            return provider;
+
+            return features;
         }
     }
 }

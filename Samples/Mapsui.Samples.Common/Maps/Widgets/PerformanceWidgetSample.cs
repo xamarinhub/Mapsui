@@ -1,25 +1,25 @@
-﻿using Mapsui.Rendering.Skia.SkiaWidgets;
+﻿using Mapsui.Extensions;
+using Mapsui.Rendering.Skia.SkiaWidgets;
 using Mapsui.UI;
 using Mapsui.Utilities;
 using Mapsui.Widgets;
-using SkiaSharp;
-using Mapsui.Extensions;
 using Mapsui.Widgets.PerformanceWidget;
+using SkiaSharp;
 
 namespace Mapsui.Samples.Common.Maps
 {
-    public class PerformanceWidgetSample : ISample
+    public class PerformanceWidgetSample : IMapControlSample
     {
-        IMapControl _mapControl;
-        readonly Performance _performance = new Performance(10);
+        private IMapControl? _mapControl;
+        private readonly Performance _performance = new Performance(10);
 
         public string Name => "4 Performance Widget";
 
         public string Category => "Widgets";
 
-        public void OnClick(object sender, WidgetTouchedEventArgs args)
+        public void OnClick(object? sender, WidgetTouchedEventArgs args)
         {
-            _mapControl?.Performance.Clear();
+            _mapControl?.Performance?.Clear();
             _mapControl?.RefreshGraphics();
 
             args.Handled = true;
@@ -30,7 +30,7 @@ namespace Mapsui.Samples.Common.Maps
             _mapControl = mapControl;
 
             //I like bing Hybrid
-            mapControl.Map = BingSample.CreateMap(BruTile.Predefined.KnownTileSource.BingHybrid);
+            mapControl.Map = BingSample.CreateMap(BingHybrid.DefaultCache, BruTile.Predefined.KnownTileSource.BingHybrid);
 
             var widget = new PerformanceWidget(_performance);
 

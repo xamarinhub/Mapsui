@@ -1,10 +1,12 @@
 ﻿using System.Collections.Generic;
-using Mapsui.Geometries;
+using System.Threading.Tasks;
 using Mapsui.Layers;
+using Mapsui.Nts.Extensions;
 using Mapsui.Providers;
 using Mapsui.Styles;
+using Mapsui.Tiling;
 using Mapsui.UI;
-using Mapsui.Utilities;
+using NetTopologySuite.Geometries;
 
 namespace Mapsui.Samples.Common.Maps
 {
@@ -13,24 +15,19 @@ namespace Mapsui.Samples.Common.Maps
         public string Name => "3 Polygons";
         public string Category => "Geometries";
 
-        public void Setup(IMapControl mapControl)
-        {
-            mapControl.Map = CreateMap();
-        }
-
-        public static Map CreateMap()
+        public Task<Map> CreateMapAsync()
         {
             var map = new Map();
             map.Layers.Add(OpenStreetMap.CreateTileLayer());
             map.Layers.Add(CreateLayer());
-            return map;
+            return Task.FromResult(map);
         }
 
         public static ILayer CreateLayer()
         {
             return new Layer("Polygons")
             {
-                DataSource = new MemoryProvider<IGeometryFeature>(CreatePolygon()),
+                DataSource = new MemoryProvider(CreatePolygon().ToFeatures()),
                 Style = new VectorStyle
                 {
                     Fill = new Brush(new Color(150, 150, 30, 128)),
@@ -38,7 +35,7 @@ namespace Mapsui.Samples.Common.Maps
                     {
                         Color = Color.Orange,
                         Width = 2,
-                        PenStyle = PenStyle.DashDotDot, //.Solid,
+                        PenStyle = PenStyle.DashDotDot,
                         PenStrokeCap = PenStrokeCap.Round
                     }
                 }
@@ -49,37 +46,45 @@ namespace Mapsui.Samples.Common.Maps
         {
             var result = new List<Polygon>();
 
-            var polygon = new Polygon();
-            polygon.ExteriorRing.Vertices.Add(new Point(0, 0));
-            polygon.ExteriorRing.Vertices.Add(new Point(0, 10000000));
-            polygon.ExteriorRing.Vertices.Add(new Point(10000000, 10000000));
-            polygon.ExteriorRing.Vertices.Add(new Point(10000000, 0));
-            polygon.ExteriorRing.Vertices.Add(new Point(0, 0));
-            var linearRing = new LinearRing();
-            linearRing.Vertices.Add(new Point(1000000, 1000000));
-            linearRing.Vertices.Add(new Point(9000000, 1000000));
-            linearRing.Vertices.Add(new Point(9000000, 9000000));
-            linearRing.Vertices.Add(new Point(1000000, 9000000));
-            linearRing.Vertices.Add(new Point(1000000, 1000000));
-            polygon.InteriorRings.Add(linearRing);
+            var polygon1 = new Polygon(
+                new LinearRing(new[] {
+                    new Coordinate(0, 0),
+                    new Coordinate(0, 10000000),
+                    new Coordinate(10000000, 10000000),
+                    new Coordinate(10000000, 0),
+                    new Coordinate(0, 0)
+                }),
+                new[] {
+                    new LinearRing(new[] {
+                        new Coordinate(1000000, 1000000),
+                        new Coordinate(9000000, 1000000),
+                        new Coordinate(9000000, 9000000),
+                        new Coordinate(1000000, 9000000),
+                        new Coordinate(1000000, 1000000)
+                    })
+                });
 
-            result.Add(polygon);
+            result.Add(polygon1);
 
-            polygon = new Polygon();
-            polygon.ExteriorRing.Vertices.Add(new Point(-10000000, 0));
-            polygon.ExteriorRing.Vertices.Add(new Point(-15000000, 5000000));
-            polygon.ExteriorRing.Vertices.Add(new Point(-10000000, 10000000));
-            polygon.ExteriorRing.Vertices.Add(new Point(-5000000, 5000000));
-            polygon.ExteriorRing.Vertices.Add(new Point(-10000000, 0));
-            linearRing = new LinearRing();
-            linearRing.Vertices.Add(new Point(-10000000, 1000000));
-            linearRing.Vertices.Add(new Point(-6000000, 5000000));
-            linearRing.Vertices.Add(new Point(-10000000, 9000000));
-            linearRing.Vertices.Add(new Point(-14000000, 5000000));
-            linearRing.Vertices.Add(new Point(-10000000, 1000000));
-            polygon.InteriorRings.Add(linearRing);
+            var polygon2 = new Polygon(
+                new LinearRing(new[] {
+                    new Coordinate(-10000000, 0),
+                    new Coordinate(-15000000, 5000000),
+                    new Coordinate(-10000000, 10000000),
+                    new Coordinate(-5000000, 5000000),
+                    new Coordinate(-10000000, 0)
+                }),
+                new[] {
+                    new LinearRing(new[] {
+                        new Coordinate(-10000000, 1000000),
+                        new Coordinate(-6000000, 5000000),
+                        new Coordinate(-10000000, 9000000),
+                        new Coordinate(-14000000, 5000000),
+                        new Coordinate(-10000000, 1000000)
+                    })
+                });
 
-            result.Add(polygon);
+            result.Add(polygon2);
 
             return result;
         }

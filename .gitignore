@@ -54,8 +54,10 @@ project.lock.json
 /Artifacts
 *.appx
 
+Mapsui.UI.Android/Resources/Resource.Designer.cs
 Samples/Mapsui.Samples.Droid/Resources/Resource.Designer.cs
 Samples/Mapsui.Samples.Forms/Mapsui.Samples.Forms.Android/Resources/Resource.designer.cs
+
 /Mapsui.UI.Uno/MapControl.cs
 /Mapsui.UI.Uno/ExtensionMethods/PointExtensions.cs
 /Mapsui.UI.Uno/Shared/Utils/FlingTracker.cs
@@ -71,3 +73,9 @@ Samples/Mapsui.Samples.Forms/Mapsui.Samples.Forms.Android/Resources/Resource.des
 AppPackages/
 *.nupkg
 
+.idea
+.DS_Store
+
+/Output-Build.txt
+/Samples/Mapsui.Samples.Uno/Mapsui.Samples.Uno.Wasm/emsdk
+*.binlog

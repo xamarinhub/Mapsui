@@ -1,4 +1,7 @@
-﻿using Mapsui.Layers;
+﻿using System.Threading.Tasks;
+using Mapsui.Cache;
+using Mapsui.Extensions.Cache;
+using Mapsui.Layers;
 using Mapsui.Providers.Wms;
 using Mapsui.UI;
 
@@ -8,38 +11,32 @@ namespace Mapsui.Samples.Common.Maps.Data
     {
         public string Name => "6. WMS";
         public string Category => "Data";
+        public static IUrlPersistentCache? DefaultCache { get; set; }
 
-        public void Setup(IMapControl mapControl)
+        public async Task<Map> CreateMapAsync()
         {
-            mapControl.Map = CreateMap();
-        }
-
-        public static Map CreateMap()
-        {
-            var map = new Map {CRS = "EPSG:28992"};
+            var map = new Map { CRS = "EPSG:28992" };
             // The WMS request needs a CRS
-            map.Layers.Add(CreateLayer());
+            map.Layers.Add(await CreateLayerAsync());
             return map;
         }
 
-        public static ILayer CreateLayer()
+        public static async Task<ILayer> CreateLayerAsync()
         {
-            return new ImageLayer("Windsnelheden (PDOK)") {DataSource = CreateWmsProvider()};
+            return new ImageLayer("Windsnelheden (PDOK)") { DataSource = await CreateWmsProviderAsync() };
         }
 
-        private static WmsProvider CreateWmsProvider()
+        private static async Task<WmsProvider> CreateWmsProviderAsync()
         {
             const string wmsUrl = "https://geodata.nationaalgeoregister.nl/windkaart/wms?request=GetCapabilities";
 
-            var provider = new WmsProvider(wmsUrl)
-            {
-                ContinueOnError = true,
-                TimeOut = 20000,
-                CRS = "EPSG:28992"
-            };
+            var provider = await WmsProvider.CreateAsync(wmsUrl, persistentCache: DefaultCache);
+            provider.ContinueOnError = true;
+            provider.TimeOut = 20000;
+            provider.CRS = "EPSG:28992";
 
             provider.AddLayer("windsnelheden100m");
-            provider.SetImageFormat(provider.OutputFormats[0]);
+            provider.SetImageFormat((provider.OutputFormats)[0]);
             return provider;
         }
     }

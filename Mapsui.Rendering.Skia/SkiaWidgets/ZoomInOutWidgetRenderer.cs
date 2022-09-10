@@ -1,5 +1,4 @@
-﻿using Mapsui.Geometries;
-using Mapsui.Rendering.Skia.Extensions;
+﻿using Mapsui.Rendering.Skia.Extensions;
 using Mapsui.Widgets;
 using Mapsui.Widgets.Zoom;
 using SkiaSharp;
@@ -10,9 +9,9 @@ namespace Mapsui.Rendering.Skia.SkiaWidgets
     {
         private const float Stroke = 3;
 
-        private static SKPaint _paintStroke;
-        private static SKPaint _paintBackground;
-        private static SKPaint _paintText;
+        private static SKPaint? _paintStroke;
+        private static SKPaint? _paintBackground;
+        private static SKPaint? _paintText;
 
         public void Draw(SKCanvas canvas, IReadOnlyViewport viewport, IWidget widget,
             float layerOpacity)
@@ -20,12 +19,17 @@ namespace Mapsui.Rendering.Skia.SkiaWidgets
             var zoomInOut = (ZoomInOutWidget)widget;
 
             // If this is the first time, we call this renderer, ...
-            if (_paintStroke == null)
+            if (_paintStroke == null || _paintBackground == null || _paintText == null)
             {
                 // ... than create the paints
+#pragma warning disable IDISP007 // Don't dispose injected
+                _paintStroke?.Dispose();
                 _paintStroke = CreatePaint(zoomInOut.StrokeColor.ToSkia(layerOpacity), Stroke, SKPaintStyle.Stroke);
+                _paintBackground?.Dispose();
                 _paintBackground = CreatePaint(zoomInOut.BackColor.ToSkia(layerOpacity), Stroke, SKPaintStyle.Fill);
+                _paintText?.Dispose();
                 _paintText = CreatePaint(zoomInOut.TextColor.ToSkia(layerOpacity), Stroke, SKPaintStyle.Fill);
+#pragma warning restore IDISP007
             }
             else
             {
@@ -65,21 +69,22 @@ namespace Mapsui.Rendering.Skia.SkiaWidgets
 
             // Perhaps we should resize the Envelop about half of stroke, because of Skia rendering have of line outside
             if (zoomInOut.Orientation == Orientation.Vertical)
-                zoomInOut.Envelope = new BoundingBox(posX, posY, posX + rect.Width, posY + rect.Width * 2 - Stroke);
+                zoomInOut.Envelope = new MRect(posX, posY, posX + rect.Width, posY + rect.Width * 2 - Stroke);
             else
-                zoomInOut.Envelope = new BoundingBox(posX, posY, posX + rect.Width * 2 - Stroke, posY + rect.Width);
+                zoomInOut.Envelope = new MRect(posX, posY, posX + rect.Width * 2 - Stroke, posY + rect.Width);
         }
 
         private static SKPaint CreatePaint(SKColor color, float strokeWidth, SKPaintStyle style)
         {
-            SKPaint paint = new SKPaint();
-
-            paint.LcdRenderText = true;
-            paint.Color = color;
-            paint.StrokeWidth = strokeWidth;
-            paint.Style = style;
-            paint.StrokeCap = SKStrokeCap.Square;
-            paint.IsAntialias = true;
+            var paint = new SKPaint
+            {
+                LcdRenderText = true,
+                Color = color,
+                StrokeWidth = strokeWidth,
+                Style = style,
+                StrokeCap = SKStrokeCap.Square,
+                IsAntialias = true
+            };
 
             return paint;
         }

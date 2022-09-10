@@ -4,17 +4,17 @@ namespace Mapsui.UI.Utils
 {
     public class FlingTracker
     {
-        const int maxSize = 50;
-        const long maxTicks = 200 * 10000;  // Use only events from the last 200 ms
+        private const int maxSize = 50;
+        private const long maxTicks = 200 * 10000;  // Use only events from the last 200 ms
 
-        readonly Dictionary<long, Queue<(double x, double y, long time)>> events;
+        private readonly Dictionary<long, Queue<(double x, double y, long time)>> events;
 
         public FlingTracker()
         {
             events = new Dictionary<long, Queue<(double x, double y, long time)>>();
         }
 
-        public void AddEvent(long id, Geometries.Point location, long ticks)
+        public void AddEvent(long id, MPoint location, long ticks)
         {
             // Save event data
             if (!events.ContainsKey(id))
@@ -23,7 +23,7 @@ namespace Mapsui.UI.Utils
             }
 
             events[id].Enqueue((location.X, location.Y, ticks));
-            
+
             // Check, if we at the end of array
             if (events[id].Count > 2)
             {
@@ -61,7 +61,7 @@ namespace Mapsui.UI.Utils
 
             long finalTime = 0;
 
-            for (var i = 1; i < eventsArray.Length; i ++)
+            for (var i = 1; i < eventsArray.Length; i++)
             {
                 (var lastX, var lastY, var lastTime) = eventsArray[i - 1];
                 (var nowX, var nowY, var nowTime) = eventsArray[i];
@@ -78,7 +78,7 @@ namespace Mapsui.UI.Utils
             }
 
             var totalTime = finalTime - firstTime;
-            
+
             return (distanceX / totalTime, distanceY / totalTime);
         }
     }

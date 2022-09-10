@@ -8,21 +8,22 @@ namespace Mapsui.Rendering.Skia
     {
         Bitmap,
         Svg,
-        Sprite
+        Sprite,
+        Picture
     }
 
-    public class BitmapInfo
+    public class BitmapInfo : IBitmapInfo
     {
-        private object _data;
+        private object? _data;
 
         public BitmapType Type { get; private set; }
 
-        public SKImage Bitmap
+        public SKImage? Bitmap
         {
             get
             {
                 if (Type == BitmapType.Bitmap)
-                    return (SKImage) _data;
+                    return _data as SKImage;
                 else
                     return null;
             }
@@ -33,12 +34,28 @@ namespace Mapsui.Rendering.Skia
             }
         }
 
-        public SKSvg Svg
+        public SKPicture? Picture
+        {
+            get
+            {
+                if (Type == BitmapType.Picture)
+                    return _data as SKPicture;
+                else
+                    return null;
+            }
+            set
+            {
+                _data = value;
+                Type = BitmapType.Picture;
+            }
+        }
+
+        public SKSvg? Svg
         {
             get
             {
                 if (Type == BitmapType.Svg)
-                    return (SKSvg) _data;
+                    return _data as SKSvg;
                 else
                     return null;
             }
@@ -49,12 +66,12 @@ namespace Mapsui.Rendering.Skia
             }
         }
 
-        public Sprite Sprite
+        public Sprite? Sprite
         {
             get
             {
                 if (Type == BitmapType.Sprite)
-                    return (Sprite)_data;
+                    return _data as Sprite;
                 else
                     return null;
             }
@@ -74,11 +91,13 @@ namespace Mapsui.Rendering.Skia
                 switch (Type)
                 {
                     case BitmapType.Bitmap:
-                        return Bitmap.Width;
+                        return Bitmap?.Width ?? 0;
                     case BitmapType.Svg:
-                        return Svg.Picture.CullRect.Width;
+                        return Svg?.Picture?.CullRect.Width ?? 0;
                     case BitmapType.Sprite:
-                        return ((Sprite) _data).Width;
+                        return Sprite?.Width ?? 0;
+                    case BitmapType.Picture:
+                        return Picture?.CullRect.Width ?? 0;
                     default:
                         return 0;
                 }
@@ -92,11 +111,13 @@ namespace Mapsui.Rendering.Skia
                 switch (Type)
                 {
                     case BitmapType.Bitmap:
-                        return Bitmap.Height;
+                        return Bitmap?.Height ?? 0;
                     case BitmapType.Svg:
-                        return Svg.Picture.CullRect.Height;
+                        return Svg?.Picture?.CullRect.Height ?? 0;
                     case BitmapType.Sprite:
-                        return ((Sprite) _data).Height;
+                        return Sprite?.Height ?? 0;
+                    case BitmapType.Picture:
+                        return Picture?.CullRect.Height ?? 0;
                     default:
                         return 0;
                 }

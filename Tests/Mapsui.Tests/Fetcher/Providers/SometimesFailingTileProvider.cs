@@ -1,15 +1,16 @@
 ﻿using System;
+using System.Threading.Tasks;
 using BruTile;
 
 namespace Mapsui.Tests.Fetcher.Providers
 {
-    class SometimesFailingTileProvider : CountingTileProvider
+    internal class SometimesFailingTileProvider : CountingTileProvider
     {
-        private readonly Random _random = new Random(DateTime.Now.Millisecond);
-        
-        public override byte[] GetTile(TileInfo tileInfo)
+        private readonly Random _random = new Random(1000);
+
+        public override async Task<byte[]?> GetTileAsync(TileInfo tileInfo)
         {
-            base.GetTile(tileInfo); // Just for counting
+            _ = await base.GetTileAsync(tileInfo); // Just for counting
 
             if (_random.NextDouble() < 0.5)
             {
@@ -17,7 +18,7 @@ namespace Mapsui.Tests.Fetcher.Providers
                     throw new Exception("this provider sometimes fails");
                 return null; // This means the tile is not available in the source
             }
-            return new byte[0];
+            return await Task.FromResult(Array.Empty<byte>());
         }
     }
 }

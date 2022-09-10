@@ -1,6 +1,10 @@
 ﻿using System.Diagnostics;
 
+#if __MAUI__
+namespace Mapsui.UI.Maui
+#else
 namespace Mapsui.UI.Forms
+#endif
 {
     /// <summary>
     /// Distance between to positions
@@ -10,17 +14,17 @@ namespace Mapsui.UI.Forms
         /// <summary>
         /// Conversion for for Miles in Meters
         /// </summary>
-        const double MetersPerMile = 1609.344;
+        private const double MetersPerMile = 1609.344;
 
         /// <summary>
         /// Conversion from Nautic Miles in Meters
         /// </summary>
-        const double MetersPerNauticalMile = 1852.216;
+        private const double MetersPerNauticalMile = 1852.216;
 
         /// <summary>
         /// Conversion from Kilometers in Meters
         /// </summary>
-        const double MetersPerKilometer = 1000.0;
+        private const double MetersPerKilometer = 1000.0;
 
         /// <summary>
         /// Constructor for <see cref="T:Mapsui.UI.Forms.Distance"/> object.
@@ -116,21 +120,21 @@ namespace Mapsui.UI.Forms
         }
 
         /// <summary>
-        /// Determines whether the specified <see cref="Mapsui.UI.Forms.Distance"/> is equal to the current <see cref="T:Mapsui.UI.Forms.Distance"/>.
+        /// Determines whether the specified <see cref="Distance"/> is equal to the current <see cref="T:Mapsui.UI.Forms.Distance"/>.
         /// </summary>
-        /// <param name="other">The <see cref="Mapsui.UI.Forms.Distance"/> to compare with the current <see cref="T:Mapsui.UI.Forms.Distance"/></param>
-        /// <returns><c>True</c> if the specified <see cref="Mapsui.UI.Forms.Distance"/> is equal to the current
+        /// <param name="other">The <see cref="Distance"/> to compare with the current <see cref="T:Mapsui.UI.Forms.Distance"/></param>
+        /// <returns><c>True</c> if the specified <see cref="Distance"/> is equal to the current
         /// <see cref="T:Mapsui.UI.Forms.Distance"/>; otherwise, <c>false</c>.</returns>
         public bool Equals(Distance other)
         {
             return Meters.Equals(other.Meters);
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (ReferenceEquals(null, obj))
                 return false;
-            return obj is Distance && Equals((Distance)obj);
+            return obj is Distance distance && Equals(distance);
         }
 
         public override int GetHashCode()

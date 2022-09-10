@@ -1,15 +1,15 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Net.Http;
+using System.Threading.Tasks;
 using BruTile;
 using BruTile.Web;
-using BruTile.Wmts;
-using Mapsui.Geometries;
+using Mapsui.Cache;
 using Mapsui.Layers;
 using Mapsui.Logging;
 using Mapsui.Providers.Wfs;
 using Mapsui.Styles;
+using Mapsui.Tiling;
+using Mapsui.Tiling.Layers;
 using Mapsui.UI;
 
 namespace Mapsui.Samples.Common.Maps.Data
@@ -18,32 +18,28 @@ namespace Mapsui.Samples.Common.Maps.Data
     {
         public string Name => "7. WFS";
         public string Category => "Data";
+        public static IUrlPersistentCache? DefaultCache { get; set; }
 
-        public void Setup(IMapControl mapControl)
-        {
-            mapControl.Map = CreateMap();
-        }
+        private const string wfsUri = "https://geoservices1.civis.bz.it/geoserver/p_bz-AdministrativeUnits/ows";
+        private const string crs = "EPSG:3857";  // originally: "EPSG:25832"
+        private const string layerName = "Districts";
+        private const string nsPrefix = "p_bz-AdministrativeUnits";
+        private const string labelField = "NAME_DE";
 
-        public static Map CreateMap()
+        public Task<Map> CreateMapAsync()
         {
             try
             {
-                const string serviceUri = "https://geoservices.buergernetz.bz.it/geoserver/ows";
-
-                var map = new Map() {CRS = "EPSG:25832"};
-                var provider = CreateWfsProvider(serviceUri);
-                map.Layers.Add(CreateTileLayer(CreateTileSource()));
+                var map = new Map() { CRS = crs };
+                var provider = CreateWfsProvider(wfsUri);
+                map.Layers.Add(OpenStreetMap.CreateTileLayer());
                 map.Layers.Add(CreateWfsLayer(provider));
                 map.Layers.Add(CreateLabelLayer(provider));
-                
-                var bb = new BoundingBox(550000, 5050000, 800000, 5400000);
-                map.Limiter = new ViewportLimiterKeepWithin
-                {
-                    PanLimits = bb
-                };
-                
-                return map;
-                
+
+                map.Home = n => n.NavigateTo(new MPoint(1270000.0, 5880000.0), map.Resolutions[9]);
+
+                return Task.FromResult(map);
+
             }
             catch (WebException ex)
             {
@@ -54,9 +50,9 @@ namespace Mapsui.Samples.Common.Maps.Data
 
         private static ILayer CreateWfsLayer(WFSProvider provider)
         {
-            return new Layer("COMUNI_AMMINISTRATIVI")
+            return new Layer(layerName)
             {
-                Style = new VectorStyle {Fill = new Brush {Color = Color.Red}},
+                Style = new VectorStyle { Fill = new Brush { Color = Color.FromArgb(192, 255, 0, 0) } },
                 DataSource = provider,
                 IsMapInfoLayer = true
             };
@@ -64,24 +60,27 @@ namespace Mapsui.Samples.Common.Maps.Data
 
         private static WFSProvider CreateWfsProvider(string getCapabilitiesUri)
         {
-            var provider = new WFSProvider(getCapabilitiesUri, "p_bz-cadastre", "COMUNI_AMMINISTRATIVI",
-                WFSProvider.WFSVersionEnum.WFS_1_1_0)
+            var provider = new WFSProvider(
+                getCapabilitiesUri, 
+                nsPrefix,
+                layerName,
+                WFSProvider.WFSVersionEnum.WFS_1_1_0,
+                persistentCache: DefaultCache)
             {
                 QuickGeometries = false,
                 GetFeatureGetRequest = true,
-                CRS = "EPSG:25832",
-                Labels = new List<string> {"CAMM_NOME_DE"}
+                CRS = crs,
+                Labels = new List<string> { labelField }
             };
             return provider;
         }
-        
+
         private static ILayer CreateLabelLayer(WFSProvider provider)
         {
             // Labels
             // Labels are collected when parsing the geometry. So there's just one 'GetFeature' call necessary.
             // Otherwise (when calling twice for retrieving labels) there may be an inconsistent read...
             // If a label property is set, the quick geometry option is automatically set to 'false'.
-            const string labelField = "CAMM_NOME_DE";
             provider.Labels.Add(labelField);
 
             return new Layer("labels")
@@ -92,31 +91,23 @@ namespace Mapsui.Samples.Common.Maps.Data
                 {
                     CollisionDetection = false,
                     ForeColor = Color.Black,
-                    Font = new Font {FontFamily = "GenericSerif", Size = 10},
+                    Font = new Font { FontFamily = "GenericSerif", Size = 10 },
                     HorizontalAlignment = LabelStyle.HorizontalAlignmentEnum.Center,
                     LabelColumn = labelField
                 }
             };
         }
-        
-        
-        
-        
-        public static HttpTileSource CreateTileSource()
-        {
-            using (var httpClient = new HttpClient())
-            using (var response = httpClient.GetStreamAsync("https://geoservices.buergernetz.bz.it/mapproxy/service/ows?SERVICE=WMTS&REQUEST=GetCapabilities").Result)
-            {
-                var tileSources = WmtsParser.Parse(response);
-                return tileSources.First(t =>
-                    ((WmtsTileSchema) t.Schema).Layer == "P_BZ_OF_2014_2015_2017" && t.Schema.Srs == "EPSG:25832");
-            }
-        }
 
-        public static ILayer CreateTileLayer(ITileSource tileSource, string name = null)
-        {
-            return new TileLayer(tileSource) {Name = name ?? tileSource.Name};
-        }
+        //public static HttpTileSource CreateTileSource()
+        //{
+        //    using (var httpClient = new HttpClient())
+        //    using (var response = httpClient.GetStreamAsync("https://geoservices.buergernetz.bz.it/mapproxy/service/ows?SERVICE=WMTS&REQUEST=GetCapabilities").Result)
+        //    {
+        //        var tileSources = WmtsParser.Parse(response);
+        //        return tileSources.First(t =>
+        //            ((WmtsTileSchema) t.Schema).Layer == "P_BZ_OF_2014_2015_2017" && t.Schema.Srs == "EPSG:25832");
+        //    }
+        //}
 
     }
 }

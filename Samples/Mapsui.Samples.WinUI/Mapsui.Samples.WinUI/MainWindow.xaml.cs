@@ -6,14 +6,13 @@ using System.IO;
 using System.Linq;
 using Windows.Storage;
 using Mapsui.Extensions;
-using Mapsui.Providers;
-using Mapsui.Providers.Wms;
 using Mapsui.Samples.Common;
+using Mapsui.Samples.Common.Extensions;
 using Mapsui.Samples.Common.Helpers;
 using Mapsui.Samples.Common.Maps;
 using Mapsui.Samples.CustomWidget;
 using Mapsui.UI;
-using Mapsui.Utilities;
+using Mapsui.Tiling;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -33,7 +32,7 @@ namespace Mapsui.Samples.WinUI
             MbTilesSample.MbTilesLocation = MbTilesLocationOnWinUI;
             MbTilesHelper.DeployMbTilesFile(s => File.Create(Path.Combine(MbTilesLocationOnWinUI, s)));
 
-            MapControl.Map.Layers.Add(OpenStreetMap.CreateTileLayer());
+            MapControl.Map!.Layers.Add(OpenStreetMap.CreateTileLayer());
             MapControl.Map.RotationLock = false;
             MapControl.UnSnapRotationDegrees = 30;
             MapControl.ReSnapRotationDegrees = 5;
@@ -47,16 +46,18 @@ namespace Mapsui.Samples.WinUI
 
         private void FillComboBoxWithCategories()
         {
-            var categories = AllSamples.GetSamples().Select(s => s.Category).Distinct().OrderBy(c => c);
+            var categories = AllSamples.GetSamples()?.Select(s => s.Category).Distinct().OrderBy(c => c);
+            if (categories == null)
+                return;
+
             foreach (var category in categories)
             {
                 CategoryComboBox.Items?.Add(category);
             }
-
             CategoryComboBox.SelectedIndex = 1;
         }
 
-        private void MapOnInfo(object sender, MapInfoEventArgs args)
+        private void MapOnInfo(object? sender, MapInfoEventArgs args)
         {
             if (args.MapInfo?.Feature != null)
                 FeatureInfo.Text = $"Click Info:{Environment.NewLine}{args.MapInfo.Feature.ToDisplayText()}";
@@ -66,16 +67,20 @@ namespace Mapsui.Samples.WinUI
         {
             var selectedCategory = CategoryComboBox.SelectedValue?.ToString() ?? "";
             SampleList.Children.Clear();
-            foreach (var sample in AllSamples.GetSamples().Where(s => s.Category == selectedCategory))
+            var samples = AllSamples.GetSamples()?.Where(s => s.Category == selectedCategory);
+            if (samples == null)
+                return;
+
+            foreach (var sample in samples)
                 SampleList.Children.Add(CreateRadioButton(sample));
         }
-        
+
         private void CategoryComboBoxSelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             FillListWithSamples();
         }
 
-        private UIElement CreateRadioButton(ISample sample)
+        private UIElement CreateRadioButton(ISampleBase sample)
         {
             var radioButton = new RadioButton
             {
@@ -84,13 +89,15 @@ namespace Mapsui.Samples.WinUI
                 Margin = new Thickness(4)
             };
 
-            radioButton.Click += (s, a) =>
-            {
-                MapControl.Map.Layers.Clear();
-                MapControl.Info -= MapOnInfo;
-                sample.Setup(MapControl);
-                MapControl.Info += MapOnInfo;
-                MapControl.Refresh();
+            radioButton.Click += (s, a) => {
+                Catch.Exceptions(async () =>
+                {
+                    MapControl.Map!.Layers.Clear();
+                    MapControl.Info -= MapOnInfo;
+                    await sample.SetupAsync(MapControl);
+                    MapControl.Info += MapOnInfo;
+                    MapControl.Refresh();
+                });
             };
 
             return radioButton;
@@ -101,7 +108,7 @@ namespace Mapsui.Samples.WinUI
         private void RotationSlider_OnValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
             var percent = RotationSlider.Value / (RotationSlider.Maximum - RotationSlider.Minimum);
-            MapControl.Navigator.RotateTo(percent * 360);
+            MapControl.Navigator?.RotateTo(percent * 360);
             MapControl.Refresh();
         }
     }

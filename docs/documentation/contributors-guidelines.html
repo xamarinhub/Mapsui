@@ -8,7 +8,7 @@
     <title>Mapsui Contributor Guidelines </title>
     <meta name="viewport" content="width=device-width">
     <meta name="title" content="Mapsui Contributor Guidelines ">
-    <meta name="generator" content="docfx 2.48.0.0">
+    <meta name="generator" content="docfx 2.58.9.0">
     
     <link rel="shortcut icon" href="../images/favicon.ico">
     <link rel="stylesheet" href="../styles/docfx.vendor.css">
@@ -59,11 +59,11 @@
       <div class="container body-content">
         
         <div id="search-results">
-          <div class="search-list"></div>
+          <div class="search-list">Search Results for <span></span></div>
           <div class="sr-items">
             <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
           </div>
-          <ul id="pagination"></ul>
+          <ul id="pagination" data-first="First" data-prev="Previous" data-next="Next" data-last="Last"></ul>
         </div>
       </div>
       <div role="main" class="container body-content hide-when-search">
@@ -80,7 +80,7 @@
 <h1 id="mapsui-contributor-guidelines">Mapsui Contributor Guidelines</h1>
 
 <h2 id="issue-first">Issue first</h2>
-<p>Submit an issue before a pull request co we can discuss the possible solutions to the problem.</p>
+<p>Submit an issue before a pull request so we can discuss the possible solutions to the problem.</p>
 <h2 id="sign-the-contributor-license-agreement-cla">Sign the Contributor License Agreement (CLA)</h2>
 <p>To contribute you need to sign our CLA </p>
 <p><a href="https://cla-assistant.io/Mapsui/Mapsui"><img src="https://cla-assistant.io/readme/badge/Mapsui/Mapsui" alt="CLA assistant"></a></p>
@@ -108,9 +108,25 @@
 <h2 id="extension-methods">Extension methods</h2>
 <ul>
 <li>Extension methods should always be in a Extensions folder. </li>
-<li>They should be in a class that has the name &#39;{ClassItExtents}Extensions&#39;. </li>
-<li>It should be in a namespace that follows the folder name (so not in the namespace of the class it extents).</li>
+<li>They should be in a class that has the name &#39;{ClassItExtends}Extensions&#39;. </li>
+<li>It should be in a namespace that follows the folder name (so not in the namespace of the class it extends).</li>
+<li>Extensions of a collection (IEnumerable, List, Array etc) of a type should also be in the class that extends the individual type.</li>
 </ul>
+<h2 id="ordering-of-lon-lat">Ordering of lon lat</h2>
+<ul>
+<li>In our code we prefor a lon, lat order consistent with the x, y order of most cartographic projections.</li>
+<li>Some background: The order of lon and lat always causes a lot of confusion. The official notation is lat, lon, but in map projections the lat corresponds to the y-axis and the lon to the x-axis. This is confusing because in math the ordering is the other way around: x, y. In our code we need to translate the lat/lon to an X/Y coordinate to draw it on the map. In the constructor of such a point the x (lon) will be the first parameter. There is no way that this problem can be fundamentally solved, there will always be some confusion. To mitigate it we choose one way of ordering which is lon, lat (consistent with x, y). </li>
+<li>Also there are many ways in which we can avoid ordering altogher. For instance if we work with Longitude and Latitude properties. In the case of SphericalMercator.FromLonLat we use lon/lat in the method name to avoid confusion.</li>
+</ul>
+<h2 id="no-rendering-in-the-drawpaint-loop">No rendering in the draw/paint loop</h2>
+<p>Mapsui strives for optiomal performance, so in the rendering loop the objects should be ready to be painted to canvas directly without any need for preparation. This is currently (4.0.0-beta.1) not the case. For instance in the case of tiles they are rendered on the first iteration, after that the cached version is used. This needs to be improved.</p>
+<h3 id="about-the-terminology">About the terminology</h3>
+<p><strong>Rendering</strong>: Create a platform specific resource.</p>
+<pre><code class="lang-csharp">SKPath path = ToSKPath(feature, style);
+</code></pre><p><strong>Drawing or Painting</strong>: Draw the platform specific resource to the canvas.</p>
+<pre><code class="lang-csharp">canvas.DrawPath(path, paint);
+</code></pre><h2 id="formatting">Formatting</h2>
+<p>We use .editorconfig and we should follow these settings. To apply it in Visual Studio you can select your file and run:: sln explorer menu | Analyze and Code Cleanup | Run Code Cleanup (Profile 1 of 2). You can configure which rules to apply in your profile. For xml (not supported by .editorconfig) two spaces indentation is used.</p>
 </article>
           </div>
           
@@ -124,7 +140,8 @@
                 </ul>
               </div>
               <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-              <!-- <p><a class="back-to-top" href="#top">Back to top</a><p> -->
+                <h5>In This Article</h5>
+                <div></div>
               </nav>
             </div>
           </div>

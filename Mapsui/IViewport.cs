@@ -1,31 +1,24 @@
-// Copyright 2010 - Paul den Dulk (Geodan)
-// 
-// This file is part of SharpMap.
-// Mapsui is free software; you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
-// (at your option) any later version.
-// 
-// SharpMap is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Lesser General Public License for more details.
+// Copyright (c) The Mapsui authors.
+// The Mapsui authors licensed this file under the MIT license.
+// See the LICENSE file in the project root for full license information.
 
-// You should have received a copy of the GNU Lesser General Public License
-// along with SharpMap; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+// This file was originally created by Paul den Dulk (Geodan) as part of SharpMap
 
-using Mapsui.Geometries;
+using System.Collections.Generic;
+using Mapsui.Animations;
+using Mapsui.Utilities;
 
 namespace Mapsui
 {
-    public interface IViewport : IReadOnlyViewport
+    public interface IViewport : IReadOnlyViewport, IAnimatable
     {
-        void SetCenter(double x, double y);
-        void SetCenter(ReadOnlyPoint center);
-        void SetResolution(double resolution);
-        void SetRotation(double rotation);
+        void SetCenter(double x, double y, long duration = 0, Easing? easing = default);
+        void SetCenterAndResolution(double x, double y, double resolution, long duration = 0, Easing? easing = default);
+        void SetCenter(MReadOnlyPoint center, long duration = 0, Easing? easing = default);
+        void SetResolution(double resolution, long duration = 0, Easing? easing = default);
+        void SetRotation(double rotation, long duration = 0, Easing? easing = default);
         void SetSize(double width, double height);
+        void SetAnimations(List<AnimationEntry<Viewport>> animations);
 
         /// <summary>
         /// Moving the position of viewport to a new one
@@ -34,6 +27,6 @@ namespace Mapsui
         /// <param name="previousPosition">Previous center of touch</param>
         /// <param name="deltaResolution">Change of resolution for transformation (&lt;1: zoom out, >1: zoom in)</param>
         /// <param name="deltaRotation">Change of rotation</param>
-        void Transform(Point position, Point previousPosition, double deltaResolution = 1, double deltaRotation = 0);
+        void Transform(MPoint position, MPoint previousPosition, double deltaResolution = 1, double deltaRotation = 0);
     }
 }

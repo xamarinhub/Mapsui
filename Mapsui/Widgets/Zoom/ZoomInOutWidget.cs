@@ -1,8 +1,7 @@
-﻿using Mapsui.Geometries;
-using Mapsui.Styles;
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Mapsui.Styles;
 
 namespace Mapsui.Widgets.Zoom
 {
@@ -26,14 +25,14 @@ namespace Mapsui.Widgets.Zoom
     /// </summary>
     public class ZoomInOutWidget : Widget, INotifyPropertyChanged
     {
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         /// <summary>
         /// Event handler which is called, when buttons are touched. If there
         /// isn't one, than the default handler is used, which change the Resolution
         /// of Viewport.
         /// </summary>
-        public event EventHandler<WidgetTouchedEventArgs> WidgetTouched;
+        public event EventHandler<WidgetTouchedEventArgs>? WidgetTouched;
 
         private float _size = 40;
 
@@ -137,7 +136,7 @@ namespace Mapsui.Widgets.Zoom
             }
         }
 
-        public override bool HandleWidgetTouched(INavigator navigator, Point position)
+        public override bool HandleWidgetTouched(INavigator navigator, MPoint position)
         {
             var handler = WidgetTouched;
 
@@ -148,14 +147,17 @@ namespace Mapsui.Widgets.Zoom
                 return args.Handled;
             }
 
+            if (Envelope == null)
+                return false;
+
             if (Orientation == Orientation.Vertical && position.Y < Envelope.MinY + Envelope.Height * 0.5 ||
                 Orientation == Orientation.Horizontal && position.X < Envelope.MinX + Envelope.Width * 0.5)
             {
-                navigator.ZoomIn();
+                navigator?.ZoomIn(500);
             }
             else
             {
-                navigator.ZoomOut();
+                navigator?.ZoomOut(500);
             }
 
             return true;

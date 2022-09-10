@@ -1,7 +1,9 @@
 ﻿using System.Linq;
 using System.Net.Http;
+using System.Threading.Tasks;
 using BruTile.Wmts;
 using Mapsui.Layers;
+using Mapsui.Tiling.Layers;
 using Mapsui.UI;
 
 namespace Mapsui.Samples.Common.Maps
@@ -11,26 +13,26 @@ namespace Mapsui.Samples.Common.Maps
         public string Name => "5 WMTS Michelin";
         public string Category => "Data";
 
-        public void Setup(IMapControl mapControl)
-        {
-            mapControl.Map = CreateMap();
-        }
-
-        public static Map CreateMap()
+       public async Task<Map> CreateMapAsync()
         {
             var map = new Map();
-            map.Layers.Add(CreateLayer());
+            map.Layers.Add(await CreateLayerAsync());
             return map;
         }
 
-        public static ILayer CreateLayer()
+        public static async Task<ILayer> CreateLayerAsync()
         {
-            using (var httpClient = new HttpClient())
-            using (var response = httpClient.GetStreamAsync("https://bertt.github.io/wmts/capabilities/michelin.xml").Result)
+            using var httpClient = new HttpClient();
+            // When testing today (20-10-2021) tile 0,0,0 returned a 500. Perhaps this should be fixed in the xml.
+            using var response = await httpClient.GetStreamAsync("https://bertt.github.io/wmts/capabilities/michelin.xml");
+            var tileSource = WmtsParser.Parse(response).First();
+
+            if (Michelin.DefaultCache != null)
             {
-                var tileSource = WmtsParser.Parse(response).First();
-                return new TileLayer(tileSource) { Name = tileSource.Name };
+                tileSource.PersistentCache = Michelin.DefaultCache;
             }
+            
+            return new TileLayer(tileSource) { Name = tileSource.Name };
         }
     }
 }

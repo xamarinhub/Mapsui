@@ -6,14 +6,14 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 using Mapsui.Extensions;
-using Mapsui.Providers;
 using Mapsui.Samples.Common;
+using Mapsui.Samples.Common.Extensions;
 using Mapsui.Samples.Common.Helpers;
 using Mapsui.Samples.Common.Maps;
 using Mapsui.Samples.CustomWidget;
+using Mapsui.Tiling;
 using Mapsui.UI;
 using Mapsui.UI.Avalonia;
-using Mapsui.Utilities;
 
 namespace Mapsui.Samples.Avalonia.Views
 {
@@ -35,11 +35,11 @@ namespace Mapsui.Samples.Avalonia.Views
             MbTilesSample.MbTilesLocation = MbTilesLocationOnAvalonia;
             MbTilesHelper.DeployMbTilesFile(s => File.Create(Path.Combine(MbTilesLocationOnAvalonia, s)));
 
-            MapControl.Map.Layers.Add(OpenStreetMap.CreateTileLayer());
+            MapControl.Map!.Layers.Add(OpenStreetMap.CreateTileLayer());
             MapControl.Map.RotationLock = false;
             MapControl.UnSnapRotationDegrees = 30;
             MapControl.ReSnapRotationDegrees = 5;
-            MapControl.Renderer.WidgetRenders[typeof(Samples.CustomWidget.CustomWidget)] = new CustomWidgetSkiaRenderer();
+            MapControl.Renderer.WidgetRenders[typeof(CustomWidget.CustomWidget)] = new CustomWidgetSkiaRenderer();
 
             RotationSlider.PointerMoved += RotationSliderOnPointerMoved;
 
@@ -48,20 +48,20 @@ namespace Mapsui.Samples.Avalonia.Views
             FillComboBoxWithCategories();
             FillListWithSamples();
         }
-        
+
         private MapControl MapControl => this.FindControl<MapControl>("MapControl");
         private ComboBox CategoryComboBox => this.FindControl<ComboBox>("CategoryComboBox");
         private TextBlock FeatureInfo => this.FindControl<TextBlock>("FeatureInfo");
         private StackPanel SampleList => this.FindControl<StackPanel>("SampleList");
         private Slider RotationSlider => this.FindControl<Slider>("RotationSlider");
-        
+
 
         private void FillComboBoxWithCategories()
         {
             Tests.Common.Utilities.LoadAssembly();
 
             var categories = AllSamples.GetSamples().Select(s => s.Category).Distinct().OrderBy(c => c);
- 
+
             CategoryComboBox.Items = categories;
 
             CategoryComboBox.SelectedIndex = 1;
@@ -80,13 +80,13 @@ namespace Mapsui.Samples.Avalonia.Views
             foreach (var sample in AllSamples.GetSamples().Where(s => s.Category == selectedCategory))
                 SampleList.Children.Add(CreateRadioButton(sample));
         }
-        
+
         private void CategoryComboBoxSelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
             FillListWithSamples();
         }
 
-        private IControl CreateRadioButton(ISample sample)
+        private IControl CreateRadioButton(ISampleBase sample)
         {
             var radioButton = new RadioButton
             {
@@ -97,11 +97,14 @@ namespace Mapsui.Samples.Avalonia.Views
 
             radioButton.Click += (s, a) =>
             {
-                MapControl.Map.Layers.Clear();
-                MapControl.Info -= MapOnInfo;
-                sample.Setup(MapControl);
-                MapControl.Info += MapOnInfo;
-                MapControl.Refresh();
+                Catch.Exceptions(async () =>
+                {
+                    MapControl.Map?.Layers.Clear();
+                    MapControl.Info -= MapOnInfo;
+                    await sample.SetupAsync(MapControl);
+                    MapControl.Info += MapOnInfo;
+                    MapControl.Refresh();
+                });
             };
 
             return radioButton;
@@ -113,7 +116,7 @@ namespace Mapsui.Samples.Avalonia.Views
         {
             // This is probably not the proper event handler for this but I don't know what is.
             var percent = RotationSlider.Value / (RotationSlider.Maximum - RotationSlider.Minimum);
-            MapControl.Navigator.RotateTo(percent * 360);
+            MapControl.Navigator?.RotateTo(percent * 360);
             MapControl.Refresh();
         }
 

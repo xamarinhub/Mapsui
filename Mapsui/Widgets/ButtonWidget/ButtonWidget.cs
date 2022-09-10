@@ -1,7 +1,6 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using Mapsui.Geometries;
 
 namespace Mapsui.Widgets.ButtonWidget
 {
@@ -26,19 +25,19 @@ namespace Mapsui.Widgets.ButtonWidget
         /// <summary>
         /// Event handler which is called, when the button is touched
         /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         /// <summary>
         /// Event handler which is called, when the button is touched
         /// </summary>
-        public event EventHandler<WidgetTouchedEventArgs> WidgetTouched;
+        public event EventHandler<WidgetTouchedEventArgs>? WidgetTouched;
 
-        private string _svgImage;
+        private string? _svgImage;
 
         /// <summary>
         /// SVG image to show for button
         /// </summary>
-        public string SvgImage
+        public string? SvgImage
         {
             get => _svgImage;
             set
@@ -55,7 +54,7 @@ namespace Mapsui.Widgets.ButtonWidget
         /// <summary>
         /// Object for prerendered image. For internal use only.
         /// </summary>
-        public object Picture { get; set; }
+        public object? Picture { get; set; }
 
         private float _rotation;
 
@@ -91,7 +90,7 @@ namespace Mapsui.Widgets.ButtonWidget
             }
         }
 
-        public override bool HandleWidgetTouched(INavigator navigator, Point position)
+        public override bool HandleWidgetTouched(INavigator navigator, MPoint position)
         {
             var args = new WidgetTouchedEventArgs(position);
 

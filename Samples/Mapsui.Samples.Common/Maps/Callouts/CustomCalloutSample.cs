@@ -3,74 +3,66 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
+using Mapsui.Extensions;
 using Mapsui.Layers;
-using Mapsui.Projection;
+using Mapsui.Projections;
 using Mapsui.Providers;
-using Mapsui.Rendering.Skia;
 using Mapsui.Styles;
+using Mapsui.Tiling;
 using Mapsui.UI;
-using Mapsui.Utilities;
 using Newtonsoft.Json;
 using SkiaSharp;
 
 // ReSharper disable UnusedAutoPropertyAccessor.Local
 // ReSharper disable once ClassNeverInstantiated.Local
+#pragma warning disable IDISP001 // Dispose created
 
 namespace Mapsui.Samples.Common.Maps.Callouts
 {
     public class CustomCalloutSample : ISample
     {
-        private static readonly Random Random = new Random();
+        private static readonly Random Random = new Random(1);
 
         public string Name => "2 Custom Callout";
         public string Category => "Info";
 
-        public void Setup(IMapControl mapControl)
-        {
-            mapControl.Map = CreateMap();
-        }
-
-        public static Map CreateMap()
+        public Task<Map> CreateMapAsync()
         {
             var map = new Map();
 
             map.Layers.Add(OpenStreetMap.CreateTileLayer());
             map.Layers.Add(CreatePointLayer());
-            map.Home = n => n.NavigateTo(map.Layers[1].Envelope.Centroid, map.Resolutions[5]);
-            return map;
+            map.Home = n => n.NavigateTo(map.Layers[1].Extent!.Centroid, map.Resolutions[5]);
+            return Task.FromResult(map);
         }
 
-        private static MemoryLayer CreatePointLayer()
+        private static Layer CreatePointLayer()
         {
-            return new MemoryLayer
+            return new Layer
             {
-                Name = "Points",
-                IsMapInfoLayer = true,
-                DataSource = new MemoryProvider<IGeometryFeature>(GetCitiesFromEmbeddedResource()),
-                Style = new VectorStyle()
+                Name = "Point",
+                DataSource = new MemoryProvider(GetCitiesFromEmbeddedResource()),
+                IsMapInfoLayer = true
             };
         }
 
-        private static IEnumerable<IGeometryFeature> GetCitiesFromEmbeddedResource()
+        private static IEnumerable<IFeature> GetCitiesFromEmbeddedResource()
         {
             const string path = "Mapsui.Samples.Common.EmbeddedResources.congo.json";
             var assembly = typeof(PointsSample).GetTypeInfo().Assembly;
-            var stream = assembly.GetManifestResourceStream(path);
+            using var stream = assembly.GetManifestResourceStream(path) ?? throw new NullReferenceException();
             var cities = DeserializeFromStream<City>(stream);
 
             return cities.Select(c =>
             {
-                var feature = new Feature();
-                var point = SphericalMercator.FromLonLat(c.Lng, c.Lat);
-                feature.Geometry = point;
+                var feature = new PointFeature(SphericalMercator.FromLonLat(c.Lng, c.Lat).ToMPoint());
                 feature["name"] = c.Name;
                 feature["country"] = c.Country;
-
                 var callbackImage = CreateCallbackImage(c);
                 var bitmapId = BitmapRegistry.Instance.Register(callbackImage);
                 var calloutStyle = CreateCalloutStyle(bitmapId);
                 feature.Styles.Add(calloutStyle);
-
                 return feature;
             });
         }
@@ -107,7 +99,7 @@ namespace Mapsui.Samples.Common.Maps.Callouts
         {
             using var paint = new SKPaint
             {
-                Color = new SKColor((byte) Random.Next(0, 256), (byte) Random.Next(0, 256), (byte) Random.Next(0, 256)),
+                Color = new SKColor((byte)Random.Next(0, 256), (byte)Random.Next(0, 256), (byte)Random.Next(0, 256)),
                 Typeface = SKTypeface.FromFamilyName(null, SKFontStyleWeight.Bold, SKFontStyleWidth.Normal,
                     SKFontStyleSlant.Upright),
                 TextSize = 20
@@ -136,8 +128,8 @@ namespace Mapsui.Samples.Common.Maps.Callouts
 
         private class City
         {
-            public string Country { get; set; }
-            public string Name { get; set; }
+            public string? Country { get; set; }
+            public string? Name { get; set; }
             public double Lat { get; set; }
             public double Lng { get; set; }
         }
@@ -147,7 +139,7 @@ namespace Mapsui.Samples.Common.Maps.Callouts
             var serializer = new JsonSerializer();
             using var sr = new StreamReader(stream);
             using var jsonTextReader = new JsonTextReader(sr);
-            return serializer.Deserialize<List<T>>(jsonTextReader);
+            return serializer.Deserialize<List<T>>(jsonTextReader) ?? new List<T>();
         }
     }
 }

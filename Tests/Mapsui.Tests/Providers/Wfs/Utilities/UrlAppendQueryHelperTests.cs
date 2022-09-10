@@ -10,56 +10,56 @@ namespace Mapsui.Tests.Providers.Wfs.Utilities
         public void AppendQueryToUrl()
         {
             // Arrange
-            string url = "www.test.de/test";
-            string query = "?query=test";
+            var url = "www.test.de/test";
+            var query = "?query=test";
 
             // Act
-            string combinedUrl = url.AppendQuery(query);
+            var combinedUrl = url.AppendQuery(query);
 
             // Assert
-            Assert.AreEqual("www.test.de/test?query=test" ,combinedUrl);
+            Assert.AreEqual("www.test.de/test?query=test", combinedUrl);
         }
 
         [Test]
         public void AppendQueryToQueryUrl()
         {
             // Arrange
-            string url = "www.test.de/test?Service=WFS";
-            string query = "?query=test";
+            var url = "www.test.de/test?Service=WFS";
+            var query = "?query=test";
 
             // Act
-            string combinedUrl = url.AppendQuery(query);
+            var combinedUrl = url.AppendQuery(query);
 
             // Assert
-            Assert.AreEqual("www.test.de/test?Service=WFS&query=test" ,combinedUrl);
+            Assert.AreEqual("www.test.de/test?Service=WFS&query=test", combinedUrl);
         }
 
         [Test]
         public void AppendQueryToQueryUrlWithAppersend()
         {
             // Arrange
-            string url = "www.test.de/test?Service=WFS&";
-            string query = "?query=test";
+            var url = "www.test.de/test?Service=WFS&";
+            var query = "?query=test";
 
             // Act
-            string combinedUrl = url.AppendQuery(query);
+            var combinedUrl = url.AppendQuery(query);
 
             // Assert
-            Assert.AreEqual("www.test.de/test?Service=WFS&query=test" ,combinedUrl);
+            Assert.AreEqual("www.test.de/test?Service=WFS&query=test", combinedUrl);
         }
 
         [Test]
         public void AppendQueryToQueryUrlWithOutQuestionMark()
         {
             // Arrange
-            string url = "www.test.de/test?Service=WFS";
-            string query = "query=test";
+            var url = "www.test.de/test?Service=WFS";
+            var query = "query=test";
 
             // Act
-            string combinedUrl = url.AppendQuery(query);
+            var combinedUrl = url.AppendQuery(query);
 
             // Assert
-            Assert.AreEqual("www.test.de/test?Service=WFS&query=test" ,combinedUrl);
+            Assert.AreEqual("www.test.de/test?Service=WFS&query=test", combinedUrl);
         }
     }
 }

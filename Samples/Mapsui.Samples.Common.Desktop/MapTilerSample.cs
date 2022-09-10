@@ -3,12 +3,14 @@ using BruTile.Cache;
 using BruTile.FileSystem;
 using BruTile.Predefined;
 using Mapsui.Layers;
+using Mapsui.Tiling.Layers;
 using Mapsui.UI;
+using System.Threading.Tasks;
 using Attribution = BruTile.Attribution;
 
 namespace Mapsui.Samples.Common.Desktop
 {
-    public class MapTilerSample : ISample
+    public class MapTilerSample : IMapControlSample
     {
         public string Name => "3 Map Tiler";
         public string Category => "Desktop";
@@ -27,7 +29,7 @@ namespace Mapsui.Samples.Common.Desktop
 
         public static ILayer CreateLayer()
         {
-            return new TileLayer(new MapTilerTileSource()) {Name = "True Marble in MapTiler"};
+            return new TileLayer(new MapTilerTileSource()) { Name = "True Marble in MapTiler" };
         }
     }
 
@@ -45,11 +47,11 @@ namespace Mapsui.Samples.Common.Desktop
         public Attribution Attribution { get; } = new Attribution();
         public ITileProvider Provider { get; }
 
-        public byte[] GetTile(TileInfo tileInfo)
+        public async Task<byte[]> GetTileAsync(TileInfo tileInfo)
         {
-            return Provider.GetTile(tileInfo);
+            return await Provider.GetTileAsync(tileInfo);
         }
-        
+
         public static ITileProvider GetTileProvider()
         {
             return new FileTileProvider(new FileCache(GetAppDir() + "\\GeoData\\TrueMarble", "png"));
@@ -66,8 +68,7 @@ namespace Mapsui.Samples.Common.Desktop
 
         private static string GetAppDir()
         {
-            return System.IO.Path.GetDirectoryName(
-              System.Reflection.Assembly.GetEntryAssembly().GetModules()[0].FullyQualifiedName);
+            return System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()!.GetModules()[0].FullyQualifiedName)!;
         }
     }
 }

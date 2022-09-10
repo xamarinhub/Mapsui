@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
-using Mapsui.Geometries;
 
 namespace Mapsui.Widgets
 {
@@ -16,7 +15,7 @@ namespace Mapsui.Widgets
         /// Returns the first Widget in the list that contains the screenPosition
         /// within it's Envelope. Returns null if there are none.
         /// </returns>
-        public static IEnumerable<IWidget> GetTouchedWidget(Point screenPosition, Point startScreenPosition,
+        public static IEnumerable<IWidget> GetTouchedWidget(MPoint screenPosition, MPoint startScreenPosition,
             IEnumerable<IWidget> widgets)
         {
             var touchedWidgets = new List<IWidget>();
@@ -27,7 +26,7 @@ namespace Mapsui.Widgets
                 // not a drag that ends above the widget.
                 if (widget.Envelope != null &&
                     widget.Enabled &&
-                    widget.Envelope.Contains(screenPosition) && 
+                    widget.Envelope.Contains(screenPosition) &&
                     widget.Envelope.Contains(startScreenPosition))
                     touchedWidgets.Add(widget);
             }

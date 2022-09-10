@@ -1,5 +1,4 @@
-﻿using Mapsui.Geometries;
-using Mapsui.Widgets;
+﻿using Mapsui.Widgets;
 
 namespace Mapsui.Styles
 {
@@ -66,26 +65,26 @@ namespace Mapsui.Styles
         private float _arrowPosition = 0.5f;
         private float _rectRadius = 4f;
         private float _shadowWidth = 2f;
-        private BoundingBox _padding = new(3f, 3f, 3f, 3f);
+        private MRect _padding = new(3f, 3f, 3f, 3f);
         private Color _color = Color.Black;
         private Color _backgroundColor = Color.White;
         private float _strokeWidth = 1f;
         private int _content = -1;
         private Offset _offset = new(0, 0);
         private double _rotation;
-        private string _title;
-        private string _subtitle;
+        private string? _title;
+        private string? _subtitle;
         private Alignment _titleTextAlignment;
         private Alignment _subtitleTextAlignment;
         private double _spacing;
         private double _maxWidth;
-        private Color _titleFontColor;
-        private Color _subtitleFontColor;
+        private Color? _titleFontColor;
+        private Color? _subtitleFontColor;
         private bool _invalidated;
 
-        public new static double DefaultWidth { get; set; } = 100;
-        public new static double DefaultHeight { get; set; } = 30;
-        
+        public static new double DefaultWidth { get; set; } = 100;
+        public static new double DefaultHeight { get; set; } = 30;
+
         /// <summary>
         /// Type of Callout
         /// </summary>
@@ -121,11 +120,6 @@ namespace Mapsui.Styles
                 }
             }
         }
-
-        /// <summary>
-        /// BoundingBox relative to offset point
-        /// </summary>
-        public BoundingBox BoundingBox = new();
 
         /// <summary>
         /// Gets or sets the rotation of the Callout in degrees (clockwise is positive)
@@ -274,7 +268,7 @@ namespace Mapsui.Styles
         /// <summary>
         /// Padding around content of Callout
         /// </summary>
-        public BoundingBox Padding
+        public MRect Padding
         {
             get => _padding;
             set
@@ -325,7 +319,7 @@ namespace Mapsui.Styles
         /// <summary>
         /// Content of Callout title label
         /// </summary>
-        public string Title
+        public string? Title
         {
             get => _title;
             set
@@ -341,7 +335,7 @@ namespace Mapsui.Styles
         /// <summary>
         /// Font color to render title
         /// </summary>
-        public Color TitleFontColor 
+        public Color? TitleFontColor
         {
             get => _titleFontColor;
             set
@@ -370,7 +364,7 @@ namespace Mapsui.Styles
         /// <summary>
         /// Content of Callout subtitle label
         /// </summary>
-        public string Subtitle
+        public string? Subtitle
         {
             get => _subtitle;
             set
@@ -386,7 +380,7 @@ namespace Mapsui.Styles
         /// <summary>
         /// Font color to render subtitle
         /// </summary>
-        public Color SubtitleFontColor
+        public Color? SubtitleFontColor
         {
             get => _subtitleFontColor;
             set
@@ -452,7 +446,7 @@ namespace Mapsui.Styles
         public Font TitleFont
         {
             get => _titleFont;
-            set 
+            set
             {
                 _titleFont = value;
                 Invalidated = true;

@@ -1,15 +1,16 @@
-using CoreFoundation;
-using Foundation;
-using UIKit;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using CoreFoundation;
 using CoreGraphics;
-using Mapsui.Geometries;
-using Mapsui.Geometries.Utilities;
+using Foundation;
 using Mapsui.UI.iOS.Extensions;
+using Mapsui.Utilities;
 using SkiaSharp.Views.iOS;
+using UIKit;
+
+#nullable enable
 
 namespace Mapsui.UI.iOS
 {
@@ -33,11 +34,10 @@ namespace Mapsui.UI.iOS
             Initialize();
         }
 
-        void Initialize()
+        private void Initialize()
         {
             _invalidate = () => {
-                RunOnUIThread(() =>
-                {
+                RunOnUIThread(() => {
                     SetNeedsDisplay();
                     _canvas?.SetNeedsDisplay();
                 });
@@ -97,33 +97,30 @@ namespace Mapsui.UI.iOS
             OnInfo(InvokeInfo(position, position, 1));
         }
 
-        void OnPaintSurface(object sender, SKPaintGLSurfaceEventArgs args)
+        private void OnPaintSurface(object? sender, SKPaintGLSurfaceEventArgs args)
         {
-            if (PixelDensity <= 0) 
+            if (PixelDensity <= 0)
                 return;
 
             var canvas = args.Surface.Canvas;
-            
+
             canvas.Scale(PixelDensity, PixelDensity);
 
             CommonDrawControl(canvas);
         }
 
-        public override void TouchesBegan(NSSet touches, UIEvent evt)
+        public override void TouchesBegan(NSSet touches, UIEvent? evt)
         {
             base.TouchesBegan(touches, evt);
 
             _innerRotation = Viewport.Rotation;
-
-            // We have a new interaction with the screen, so stop all navigator animations
-            Navigator.StopRunningAnimation();
         }
 
-        public override void TouchesMoved(NSSet touches, UIEvent evt)
+        public override void TouchesMoved(NSSet touches, UIEvent? evt)
         {
             base.TouchesMoved(touches, evt);
 
-            if (evt.AllTouches.Count == 1)
+            if (evt?.AllTouches.Count == 1)
             {
                 if (touches.AnyObject is UITouch touch)
                 {
@@ -136,20 +133,20 @@ namespace Mapsui.UI.iOS
                     _innerRotation = Viewport.Rotation;
                 }
             }
-            else if (evt.AllTouches.Count >= 2)
+            else if (evt?.AllTouches.Count >= 2)
             {
-                var previousLocation = evt.AllTouches.Select(t => ((UITouch) t).PreviousLocationInView(this))
-                    .Select(p => new Point(p.X, p.Y)).ToList();
+                var previousLocation = evt.AllTouches.Select(t => ((UITouch)t).PreviousLocationInView(this))
+                    .Select(p => new MPoint(p.X, p.Y)).ToList();
 
-                var locations = evt.AllTouches.Select(t => ((UITouch) t).LocationInView(this))
-                    .Select(p => new Point(p.X, p.Y)).ToList();
+                var locations = evt.AllTouches.Select(t => ((UITouch)t).LocationInView(this))
+                    .Select(p => new MPoint(p.X, p.Y)).ToList();
 
                 var (previousCenter, previousRadius, previousAngle) = GetPinchValues(previousLocation);
                 var (center, radius, angle) = GetPinchValues(locations);
 
                 double rotationDelta = 0;
 
-                if (!Map.RotationLock)
+                if (!(Map?.RotationLock ?? false))
                 {
                     _innerRotation += angle - previousAngle;
                     _innerRotation %= 360;
@@ -175,7 +172,7 @@ namespace Mapsui.UI.iOS
             }
         }
 
-        public override void TouchesEnded(NSSet touches, UIEvent e)
+        public override void TouchesEnded(NSSet touches, UIEvent? e)
         {
             Refresh();
         }
@@ -185,9 +182,9 @@ namespace Mapsui.UI.iOS
         /// </summary>
         /// <param name="point"></param>
         /// <returns></returns>
-        private Point GetScreenPosition(CGPoint point)
+        private MPoint GetScreenPosition(CGPoint point)
         {
-            return new Point(point.X, point.Y);
+            return new MPoint(point.X, point.Y);
         }
 
         private void RunOnUIThread(Action action)
@@ -222,17 +219,29 @@ namespace Mapsui.UI.iOS
 
         public new void Dispose()
         {
-            Unsubscribe();
+            IosCommonDispose(true);
             base.Dispose();
         }
 
         protected override void Dispose(bool disposing)
         {
-            Unsubscribe();
+            IosCommonDispose(disposing);
             base.Dispose(disposing);
         }
 
-        private static (Point centre, double radius, double angle) GetPinchValues(List<Point> locations)
+        private void IosCommonDispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _map?.Dispose();
+                Unsubscribe();
+                _canvas?.Dispose();
+            }
+
+            CommonDispose(disposing);
+        }
+
+        private static (MPoint centre, double radius, double angle) GetPinchValues(List<MPoint> locations)
         {
             if (locations.Count < 2)
                 throw new ArgumentException();
@@ -253,15 +262,15 @@ namespace Mapsui.UI.iOS
 
             var angle = Math.Atan2(locations[1].Y - locations[0].Y, locations[1].X - locations[0].X) * 180.0 / Math.PI;
 
-            return (new Point(centerX, centerY), radius, angle);
+            return (new MPoint(centerX, centerY), radius, angle);
         }
 
-        private float ViewportWidth => (float) _canvas.Frame.Width; // todo: check if we need _canvas
-        private float ViewportHeight => (float) _canvas.Frame.Height; // todo: check if we need _canvas
+        private float ViewportWidth => (float)_canvas.Frame.Width; // todo: check if we need _canvas
+        private float ViewportHeight => (float)_canvas.Frame.Height; // todo: check if we need _canvas
 
         private float GetPixelDensity()
         {
-            return (float) _canvas.ContentScaleFactor; // todo: Check if I need canvas        
+            return (float)_canvas.ContentScaleFactor; // todo: Check if I need canvas        
         }
     }
 }

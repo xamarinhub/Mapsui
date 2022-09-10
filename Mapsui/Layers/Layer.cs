@@ -1,44 +1,30 @@
-// TODO: There are parts talking about SharpMap
+// Copyright (c) The Mapsui authors.
+// The Mapsui authors licensed this file under the MIT license.
+// See the LICENSE file in the project root for full license information.
 
-// Copyright 2005, 2006 - Morten Nielsen (www.iter.dk)
-//
-// This file is part of SharpMap.
-// Mapsui is free software; you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
-// (at your option) any later version.
-// 
-// SharpMap is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Lesser General Public License for more details.
+// This file was originally created by Morten Nielsen (www.iter.dk) as part of SharpMap
 
-// You should have received a copy of the GNU Lesser General Public License
-// along with SharpMap; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
-
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
-using Mapsui.Extensions;
 using Mapsui.Fetcher;
-using Mapsui.Geometries;
 using Mapsui.Providers;
-using Mapsui.Utilities;
-
-// todo: Use Transformer only to translate between provider and cache. Layer only interacts with cache.
-// todo: Put the dataSource envelop in the cache (it should not just be the envelope of the cached data, but all data in dataSource). 
+using Mapsui.Styles;
 
 namespace Mapsui.Layers
 {
-    public class Layer: BaseLayer, IAsyncDataFetcher
+    public class Layer : BaseLayer, IAsyncDataFetcher, ILayerDataSource<IProvider>
     {
-        private IProvider<IFeature> _dataSource;
+        private IProvider? _dataSource;
         private readonly object _syncRoot = new();
         private readonly ConcurrentStack<IFeature> _cache = new();
         private readonly FeatureFetchDispatcher<IFeature> _fetchDispatcher;
         private readonly FetchMachine _fetchMachine;
+
+        public SymbolStyle? SymbolStyle { get; set; }
+        public List<Func<bool>> Animations { get; } = new List<Func<bool>>();
         public Delayer Delayer { get; } = new();
 
         /// <summary>
@@ -49,10 +35,10 @@ namespace Mapsui.Layers
         /// <summary>
         /// Create layer with name
         /// </summary>
-        /// <param name="layername">Name to use for layer</param>
-        public Layer(string layername) : base(layername)
+        /// <param name="layerName">Name to use for layer</param>
+        public Layer(string layerName) : base(layerName)
         {
-            _fetchDispatcher = new FeatureFetchDispatcher<IFeature>(_cache, Transformer);
+            _fetchDispatcher = new FeatureFetchDispatcher<IFeature>(_cache);
             _fetchDispatcher.DataChanged += FetchDispatcherOnDataChanged;
             _fetchDispatcher.PropertyChanged += FetchDispatcherOnPropertyChanged;
 
@@ -62,6 +48,7 @@ namespace Mapsui.Layers
         /// <summary>
         /// Time to wait before fetching data
         /// </summary>
+        // ReSharper disable once UnusedMember.Global // todo: Create a sample for this field
         public int FetchingPostponedInMilliseconds
         {
             get => Delayer.MillisecondsToWait;
@@ -70,7 +57,7 @@ namespace Mapsui.Layers
         /// <summary>
         /// Data source for this layer
         /// </summary>
-        public IProvider<IFeature> DataSource
+        public IProvider? DataSource
         {
             get => _dataSource;
             set
@@ -82,16 +69,15 @@ namespace Mapsui.Layers
 
                 if (_dataSource != null)
                 {
-                    Transformer.FromCRS = _dataSource?.CRS;
                     _fetchDispatcher.DataSource = _dataSource;
                 }
 
                 OnPropertyChanged(nameof(DataSource));
-                OnPropertyChanged(nameof(Envelope));
+                OnPropertyChanged(nameof(Extent));
             }
         }
 
-        private void FetchDispatcherOnPropertyChanged(object sender, PropertyChangedEventArgs propertyChangedEventArgs)
+        private void FetchDispatcherOnPropertyChanged(object? sender, PropertyChangedEventArgs propertyChangedEventArgs)
         {
             if (propertyChangedEventArgs.PropertyName == nameof(Busy))
             {
@@ -104,9 +90,9 @@ namespace Mapsui.Layers
             OnDataChanged(args);
         }
 
-        private void DelayedFetch(BoundingBox extent, double resolution)
+        private void DelayedFetch(FetchInfo fetchInfo)
         {
-            _fetchDispatcher.SetViewport(extent, resolution);
+            _fetchDispatcher.SetViewport(fetchInfo);
             _fetchMachine.Start();
         }
 
@@ -114,19 +100,19 @@ namespace Mapsui.Layers
         /// Returns the extent of the layer
         /// </summary>
         /// <returns>Bounding box corresponding to the extent of the features in the layer</returns>
-        public override BoundingBox Envelope
+        public override MRect? Extent
         {
             get
             {
                 lock (_syncRoot)
                 {
-                    return ProjectionHelper.Transform(DataSource?.GetExtents(), Transformation, DataSource?.CRS, CRS);
+                    return DataSource?.GetExtent();
                 }
             }
         }
 
         /// <inheritdoc />
-        public override IEnumerable<IFeature> GetFeaturesInView(BoundingBox extent, double resolution)
+        public override IEnumerable<IFeature> GetFeatures(MRect extent, double resolution)
         {
             return _cache.ToList();
         }
@@ -144,23 +130,26 @@ namespace Mapsui.Layers
         }
 
         /// <inheritdoc />
-        public override void RefreshData(BoundingBox extent, double resolution, ChangeType changeType)
+        public void RefreshData(FetchInfo fetchInfo)
         {
             if (!Enabled) return;
-            if (MinVisible > resolution) return;
-            if (MaxVisible < resolution) return;
+            if (MinVisible > fetchInfo.Resolution) return;
+            if (MaxVisible < fetchInfo.Resolution) return;
             if (DataSource == null) return;
-            if (changeType == ChangeType.Continuous) return;
+            if (fetchInfo.ChangeType == ChangeType.Continuous) return;
 
-            Delayer.ExecuteDelayed(() => DelayedFetch(extent.Copy(), resolution));
+            Delayer.ExecuteDelayed(() => DelayedFetch(fetchInfo));
         }
 
-        /// <inheritdoc />
-        public override bool? IsCrsSupported(string crs)
+        public override bool UpdateAnimations()
         {
-            if (Transformation == null) return null;
-            if (DataSource == null) return null;
-            return Transformation.IsProjectionSupported(DataSource.CRS, crs);
+            var areAnimationsRunning = false;
+            foreach (var animation in Animations)
+            {
+                if (animation())
+                    areAnimationsRunning = true;
+            }
+            return areAnimationsRunning;
         }
     }
 }

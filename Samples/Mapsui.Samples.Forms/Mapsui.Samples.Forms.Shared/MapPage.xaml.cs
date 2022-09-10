@@ -1,30 +1,38 @@
 ﻿using System;
+using Xamarin.Essentials;
 using Xamarin.Forms;
 using Xamarin.Forms.Xaml;
-using Mapsui.UI.Forms;
 using Plugin.Geolocator;
 using Plugin.Geolocator.Abstractions;
-using Mapsui.UI;
 using System.Threading.Tasks;
+using Mapsui.Logging;
+using Mapsui.Samples.Common;
+using Mapsui.Samples.Common.Extensions;
 using Mapsui.Samples.CustomWidget;
 using Mapsui.Styles;
-using Xamarin.Essentials;
+using Mapsui.UI.Forms;
+using Mapsui.UI.Objects;
+using Mapsui.Extensions;
 
 namespace Mapsui.Samples.Forms
 {
-	[XamlCompilation(XamlCompilationOptions.Compile)]
-	public partial class MapPage : ContentPage
-	{
-        public Func<MapView, MapClickedEventArgs, bool> Clicker { get; set; }
+    [XamlCompilation(XamlCompilationOptions.Compile)]
+    public partial class MapPage : ContentPage
+    {
+        public Func<MapView?, MapClickedEventArgs, bool>? Clicker { get; set; }
 
-        public MapPage ()
-		{
+        public MapPage()
+        {
             InitializeComponent();
         }
 
-        public MapPage(Action<IMapControl> setup, Func<MapView, MapClickedEventArgs, bool> c = null)
+        public MapPage(ISampleBase sample, Func<MapView?, MapClickedEventArgs, bool>? c = null)
         {
             InitializeComponent();
+            Refs.AddRef(this);
+            Refs.AddRef(mapView);
+
+            Title = sample.Name;
 
             mapView.RotationLock = false;
             mapView.UnSnapRotationDegrees = 30;
@@ -36,20 +44,34 @@ namespace Mapsui.Samples.Forms
             Compass.ReadingChanged += Compass_ReadingChanged;
 
             mapView.MyLocationLayer.UpdateMyLocation(new UI.Forms.Position());
+            mapView.MyLocationLayer.CalloutText = "My location!\n";
+            mapView.MyLocationLayer.Clicked += MyLocationClicked;
 
-            mapView.Info += MapView_Info;
             mapView.Renderer.WidgetRenders[typeof(CustomWidget.CustomWidget)] = new CustomWidgetSkiaRenderer();
 
-            Task.Run(() => StartGPS());
+            Catch.TaskRun(() => StartGPSAsync());
 
             try
             {
                 if (!Compass.IsMonitoring)
                     Compass.Start(SensorSpeed.Default);
             }
-            catch (Exception) { }
+            catch (Exception ex) 
+            {
+                Logger.Log(LogLevel.Warning, ex.Message, ex);
+            }
 
-            setup(mapView);
+            Catch.TaskRun(async () =>
+            {
+                try
+                {
+                    await sample.SetupAsync(mapView);
+                }
+                catch (Exception e)
+                {
+                    Logger.Log(LogLevel.Error, e.Message, e);   
+                }
+            });
 
             Clicker = c;
         }
@@ -60,26 +82,26 @@ namespace Mapsui.Samples.Forms
             mapView.Refresh();
         }
 
-        private void MapView_Info(object sender, UI.MapInfoEventArgs e)
+        protected override void OnDisappearing()
         {
-            if (e?.MapInfo?.Feature != null)
-            {
-                foreach (var style in e.MapInfo.Feature.Styles)
-                {
-                    if (style is CalloutStyle)
-                    {
-                        style.Enabled = !style.Enabled;
-                        e.Handled = true;
-                    }
-                }
+            base.OnDisappearing();
 
-                mapView.Refresh();
+            mapView.PinClicked -= OnPinClicked;
+            mapView.MapClicked -= OnMapClicked;
+
+            Compass.ReadingChanged -= Compass_ReadingChanged;
+            CrossGeolocator.Current.PositionChanged -= MyLocationPositionChanged;
+            CrossGeolocator.Current.PositionError -= MyLocationPositionError;
+
+            if (LeaksPage.DisposeMapView)
+            {
+                mapView.Dispose();
             }
         }
 
         private void OnMapClicked(object sender, MapClickedEventArgs e)
         {
-            e.Handled = Clicker != null ? (bool)Clicker?.Invoke(sender as MapView, e) : false;
+            e.Handled = Clicker != null ? (Clicker?.Invoke(sender as MapView, e) ?? false) : false;
             //Samples.SetPins(mapView, e);
             //Samples.DrawPolylines(mapView, e);
         }
@@ -104,7 +126,7 @@ namespace Mapsui.Samples.Forms
             e.Handled = true;
         }
 
-        public async Task StartGPS()
+        public async Task StartGPSAsync()
         {
             if (CrossGeolocator.Current.IsListening)
                 return;
@@ -128,7 +150,7 @@ namespace Mapsui.Samples.Forms
             CrossGeolocator.Current.PositionError += MyLocationPositionError;
         }
 
-        public async Task StopGPS()
+        public async Task StopGPSAsync()
         {
             // Stop GPS
             if (CrossGeolocator.Current.IsListening)
@@ -153,20 +175,30 @@ namespace Mapsui.Samples.Forms
         /// <param name="e">Event arguments for new position</param>
         private void MyLocationPositionChanged(object sender, PositionEventArgs e)
         {
-            Device.BeginInvokeOnMainThread(() =>
-            {
+            Device.BeginInvokeOnMainThread(() => {
                 var coords = new UI.Forms.Position(e.Position.Latitude, e.Position.Longitude);
                 info.Text = $"{coords.ToString()} - D:{(int)e.Position.Heading} S:{Math.Round(e.Position.Speed, 2)}";
-                
+
                 mapView.MyLocationLayer.UpdateMyLocation(new UI.Forms.Position(e.Position.Latitude, e.Position.Longitude));
                 mapView.MyLocationLayer.UpdateMyDirection(e.Position.Heading, mapView.Viewport.Rotation);
                 mapView.MyLocationLayer.UpdateMySpeed(e.Position.Speed);
+                mapView.MyLocationLayer.CalloutText = $"My location:\nlat={e.Position.Latitude:F6}°\nlon={e.Position.Longitude:F6}°";
             });
         }
 
         private void Compass_ReadingChanged(object sender, CompassChangedEventArgs e)
         {
             mapView.MyLocationLayer.UpdateMyViewDirection(e.Reading.HeadingMagneticNorth, mapView.Viewport.Rotation, false);
+        }
+
+        public void MyLocationClicked(object sender, DrawableClickedEventArgs args)
+        {
+            var myLocLayer = sender as MyLocationLayer;
+            args.Handled = true;
+            if (myLocLayer == null)
+                return;
+            // toggle label
+            myLocLayer.ShowCallout = !myLocLayer.ShowCallout;
         }
     }
 }

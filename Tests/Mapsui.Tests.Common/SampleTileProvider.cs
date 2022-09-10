@@ -1,15 +1,16 @@
 ﻿using System;
-using BruTile;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Threading.Tasks;
+using BruTile;
 
 namespace Mapsui.Tests.Common
 {
     public class SampleTileProvider : ITileProvider
     {
-        readonly IDictionary<TileIndex, byte[]> _dictionary = new Dictionary<TileIndex, byte[]>();
-        
+        private readonly IDictionary<TileIndex, byte[]> _dictionary = new Dictionary<TileIndex, byte[]>();
+
         public SampleTileProvider()
         {
             AddTile(new TileIndex(0, 0, 0));
@@ -21,12 +22,13 @@ namespace Mapsui.Tests.Common
 
         private void AddTile(TileIndex tileIndex)
         {
-            _dictionary[tileIndex] = ReadFully(GetTileStream(tileIndex));
+            using var tileStream = GetTileStream(tileIndex);
+            _dictionary[tileIndex] = ReadFully(tileStream);
         }
 
-        public byte[] GetTile(TileInfo tileInfo)
+        public Task<byte[]> GetTileAsync(TileInfo tileInfo)
         {
-            return _dictionary[tileInfo.Index];
+            return Task.FromResult(_dictionary[tileInfo.Index]);
         }
 
         private static Stream GetTileStream(TileIndex index)

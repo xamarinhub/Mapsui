@@ -1,24 +1,26 @@
-﻿using Mapsui.Providers;
-using Mapsui.Samples.Common;
-using Mapsui.Samples.CustomWidget;
-using Mapsui.UI.Forms;
-using Plugin.Geolocator;
+﻿using Plugin.Geolocator;
 using Plugin.Geolocator.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Mapsui.Extensions;
-using Mapsui.Styles;
 using Xamarin.Forms;
 using Xamarin.Forms.Xaml;
+using Mapsui.Extensions;
+using Mapsui.Logging;
+using Mapsui.Samples.Common;
+using Mapsui.Samples.Common.Extensions;
+using Mapsui.Samples.CustomWidget;
+using Mapsui.Styles;
+using Mapsui.UI.Forms;
+using Mapsui.UI.Objects;
 
 namespace Mapsui.Samples.Forms
 {
     [XamlCompilation(XamlCompilationOptions.Compile)]
     public partial class MainPageLarge : ContentPage
     {
-        IEnumerable<ISample> allSamples;
-        Func<object, EventArgs, bool> clicker;
+        IEnumerable<ISampleBase>? allSamples;
+        Func<object?, EventArgs, bool>? clicker;
 
         public MainPageLarge()
         {
@@ -39,8 +41,9 @@ namespace Mapsui.Samples.Forms
             mapView.MapClicked += OnMapClicked;
 
             mapView.MyLocationLayer.UpdateMyLocation(new UI.Forms.Position());
+            mapView.MyLocationLayer.CalloutText = "My location!\n";
+            mapView.MyLocationLayer.Clicked += MyLocationClicked;
 
-            mapView.Info += MapView_Info;
             mapView.Renderer.WidgetRenders[typeof(CustomWidget.CustomWidget)] = new CustomWidgetSkiaRenderer();
 
             StartGPS();
@@ -49,30 +52,6 @@ namespace Mapsui.Samples.Forms
         protected override void OnAppearing()
         {
             mapView.Refresh();
-        }
-
-        private void MapView_Info(object sender, UI.MapInfoEventArgs e)
-        {
-            if (e.MapInfo.Feature is IGeometryFeature geometryFeature)
-            {
-                featureInfo.Text = $"Click Info:";
-
-                if (e?.MapInfo?.Feature != null)
-                {
-                    featureInfo.Text = $"Click Info:{Environment.NewLine}{geometryFeature.ToDisplayText()}";
-
-                    foreach (var style in e.MapInfo.Feature.Styles)
-                    {
-                        if (style is CalloutStyle)
-                        {
-                            style.Enabled = !style.Enabled;
-                            e.Handled = true;
-                        }
-                    }
-
-                    mapView.Refresh();
-                }
-            }
         }
 
         private void FillListWithSamples()
@@ -88,7 +67,7 @@ namespace Mapsui.Samples.Forms
 
         private void OnMapClicked(object sender, MapClickedEventArgs e)
         {
-            e.Handled = clicker == null ? false : (bool)clicker?.Invoke(sender as MapView, e);
+            e.Handled = clicker != null && (clicker?.Invoke(sender as MapView, e) ?? false);
         }
 
         void OnSelection(object sender, SelectedItemChangedEventArgs e)
@@ -99,16 +78,20 @@ namespace Mapsui.Samples.Forms
             }
 
             var sampleName = e.SelectedItem.ToString();
-            var sample = allSamples.Where(x => x.Name == sampleName).FirstOrDefault<ISample>();
+            var sample = allSamples.Where(x => x.Name == sampleName).FirstOrDefault<ISampleBase>();
 
             if (sample != null)
             {
-                sample.Setup(mapView);
+                mapView.Reset();
+                Catch.Exceptions(async () =>
+                {
+                    await sample.SetupAsync(mapView);
+                });            
             }
 
             clicker = null;
-            if (sample is IFormsSample)
-                clicker = ((IFormsSample)sample).OnClick;
+            if (sample is IFormsSample formsSample)
+                clicker = formsSample.OnClick;
 
             listView.SelectedItem = null;
         }
@@ -135,36 +118,51 @@ namespace Mapsui.Samples.Forms
 
         public async void StartGPS()
         {
-            if (Device.RuntimePlatform == Device.WPF)
-                return;
-            // Start GPS
-            await CrossGeolocator.Current.StartListeningAsync(TimeSpan.FromSeconds(1),
-                    1,
-                    true,
-                    new ListenerSettings
-                    {
-                        ActivityType = ActivityType.Fitness,
-                        AllowBackgroundUpdates = false,
-                        DeferLocationUpdates = true,
-                        DeferralDistanceMeters = 1,
-                        DeferralTime = TimeSpan.FromSeconds(0.2),
-                        ListenForSignificantChanges = false,
-                        PauseLocationUpdatesAutomatically = true
-                    });
+            try
+            {
+                if (Device.RuntimePlatform == Device.WPF)
+                    return;
+                // Start GPS
+                await CrossGeolocator.Current.StartListeningAsync(TimeSpan.FromSeconds(1),
+                        1,
+                        true,
+                        new ListenerSettings
+                        {
+                            ActivityType = ActivityType.Fitness,
+                            AllowBackgroundUpdates = false,
+                            DeferLocationUpdates = true,
+                            DeferralDistanceMeters = 1,
+                            DeferralTime = TimeSpan.FromSeconds(0.2),
+                            ListenForSignificantChanges = false,
+                            PauseLocationUpdatesAutomatically = true
+                        });
 
-            CrossGeolocator.Current.PositionChanged += MyLocationPositionChanged;
-            CrossGeolocator.Current.PositionError += MyLocationPositionError;
+                CrossGeolocator.Current.PositionChanged += MyLocationPositionChanged;
+                CrossGeolocator.Current.PositionError += MyLocationPositionError;
+
+            }
+            catch (Exception ex)
+            {
+                Logger.Log(LogLevel.Error, ex.Message, ex);
+            }
         }
 
         public async void StopGPS()
         {
-            if (Device.RuntimePlatform == Device.WPF)
-                return;
-
-            // Stop GPS
-            if (CrossGeolocator.Current.IsListening)
+            try
             {
-                await CrossGeolocator.Current.StopListeningAsync();
+                if (Device.RuntimePlatform == Device.WPF)
+                    return;
+
+                // Stop GPS
+                if (CrossGeolocator.Current.IsListening)
+                {
+                    await CrossGeolocator.Current.StopListeningAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log(LogLevel.Error, ex.Message, ex);
             }
         }
 
@@ -184,13 +182,23 @@ namespace Mapsui.Samples.Forms
         /// <param name="e">Event arguments for new position</param>
         private void MyLocationPositionChanged(object sender, PositionEventArgs e)
         {
-            Device.BeginInvokeOnMainThread(() =>
-            {
+            Device.BeginInvokeOnMainThread(() => {
                 mapView.MyLocationLayer.UpdateMyLocation(new UI.Forms.Position(e.Position.Latitude, e.Position.Longitude));
                 mapView.MyLocationLayer.UpdateMyDirection(e.Position.Heading, mapView.Viewport.Rotation);
                 mapView.MyLocationLayer.UpdateMySpeed(e.Position.Speed);
+                mapView.MyLocationLayer.CalloutText = $"My location:\nlat={e.Position.Latitude:F6}°\nlon={e.Position.Longitude:F6}°";
             });
         }
 
+
+        public void MyLocationClicked(object sender, DrawableClickedEventArgs args)
+        {
+            var myLocLayer = sender as MyLocationLayer;
+            args.Handled = true;
+            if (myLocLayer == null)
+                return;
+            // toggle label
+            myLocLayer.ShowCallout = !myLocLayer.ShowCallout;
+        }
     }
 }

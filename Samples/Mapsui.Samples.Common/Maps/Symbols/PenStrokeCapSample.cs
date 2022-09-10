@@ -1,10 +1,12 @@
 ﻿using System.Collections.Generic;
-using Mapsui.Geometries;
+using System.Threading.Tasks;
 using Mapsui.Layers;
+using Mapsui.Nts;
 using Mapsui.Providers;
 using Mapsui.Styles;
+using Mapsui.Tiling;
 using Mapsui.UI;
-using Mapsui.Utilities;
+using NetTopologySuite.Geometries;
 
 namespace Mapsui.Samples.Common.Maps
 {
@@ -16,40 +18,35 @@ namespace Mapsui.Samples.Common.Maps
         public string Name => "Pen Stroke Cap";
         public string Category => "Symbols";
 
-        public void Setup(IMapControl mapControl)
-        {
-            mapControl.Map = CreateMap();
-        }
-
-        public static Map CreateMap()
+        public Task<Map> CreateMapAsync()
         {
             var map = new Map();
             map.Layers.Add(OpenStreetMap.CreateTileLayer());
             map.Layers.Add(CreateLayer());
-            return map;
+            return Task.FromResult(map);
         }
 
         public static ILayer CreateLayer()
         {
             return new Layer("Polygons")
             {
-                DataSource = new MemoryProvider<IGeometryFeature>(CreatePolygon()),
+                DataSource = new MemoryProvider(CreatePolygon()),
                 Style = null
             };
         }
 
-        private static IEnumerable<IGeometryFeature> CreatePolygon()
+        private static IEnumerable<IFeature> CreatePolygon()
         {
             return new[]
             {
-                new Feature
+                new GeometryFeature
                 {
                     Geometry = new LineString(new[]
                     {
-                        new Point(1 * PolygonSize, 1 * PolygonSize),
-                        new Point(1 * PolygonSize, 2 * PolygonSize),
-                        new Point(2 * PolygonSize, 2 * PolygonSize),
-                        new Point(2 * PolygonSize, 1 * PolygonSize)
+                        new Coordinate(1 * PolygonSize, 1 * PolygonSize),
+                        new Coordinate(1 * PolygonSize, 2 * PolygonSize),
+                        new Coordinate(2 * PolygonSize, 2 * PolygonSize),
+                        new Coordinate(2 * PolygonSize, 1 * PolygonSize)
                     }),
                     Styles = new[]
                     {
@@ -59,14 +56,14 @@ namespace Mapsui.Samples.Common.Maps
                         }
                     },
                 },
-                new Feature
+                new GeometryFeature
                 {
                     Geometry = new LineString(new[]
                     {
-                        new Point(1 * PolygonSize, 1 * PolygonSize),
-                        new Point(1 * PolygonSize, 2 * PolygonSize),
-                        new Point(2 * PolygonSize, 2 * PolygonSize),
-                        new Point(2 * PolygonSize, 1 * PolygonSize)
+                        new Coordinate(1 * PolygonSize, 1 * PolygonSize),
+                        new Coordinate(1 * PolygonSize, 2 * PolygonSize),
+                        new Coordinate(2 * PolygonSize, 2 * PolygonSize),
+                        new Coordinate(2 * PolygonSize, 1 * PolygonSize)
                     }),
                     Styles = new[]
                     {
@@ -76,14 +73,14 @@ namespace Mapsui.Samples.Common.Maps
                         }
                     },
                 },
-                new Feature
+                new GeometryFeature
                 {
                     Geometry = new LineString(new[]
                     {
-                        new Point(1 * PolygonSize, -1 * PolygonSize),
-                        new Point(1 * PolygonSize, -2 * PolygonSize),
-                        new Point(2 * PolygonSize, -2 * PolygonSize),
-                        new Point(2 * PolygonSize, -1 * PolygonSize)
+                        new Coordinate(1 * PolygonSize, -1 * PolygonSize),
+                        new Coordinate(1 * PolygonSize, -2 * PolygonSize),
+                        new Coordinate(2 * PolygonSize, -2 * PolygonSize),
+                        new Coordinate(2 * PolygonSize, -1 * PolygonSize)
                     }),
                     Styles = new[]
                     {
@@ -93,14 +90,14 @@ namespace Mapsui.Samples.Common.Maps
                         }
                     },
                 },
-                new Feature
+                new GeometryFeature
                 {
                     Geometry = new LineString(new[]
                     {
-                        new Point(1 * PolygonSize, -1 * PolygonSize),
-                        new Point(1 * PolygonSize, -2 * PolygonSize),
-                        new Point(2 * PolygonSize, -2 * PolygonSize),
-                        new Point(2 * PolygonSize, -1 * PolygonSize)
+                        new Coordinate(1 * PolygonSize, -1 * PolygonSize),
+                        new Coordinate(1 * PolygonSize, -2 * PolygonSize),
+                        new Coordinate(2 * PolygonSize, -2 * PolygonSize),
+                        new Coordinate(2 * PolygonSize, -1 * PolygonSize)
                     }),
                     Styles = new[]
                     {
@@ -110,14 +107,14 @@ namespace Mapsui.Samples.Common.Maps
                         }
                     },
                 },
-                new Feature
+                new GeometryFeature
                 {
                     Geometry = new LineString(new[]
                     {
-                        new Point(-1 * PolygonSize, 1 * PolygonSize),
-                        new Point(-1 * PolygonSize, 2 * PolygonSize),
-                        new Point(-2 * PolygonSize, 2 * PolygonSize),
-                        new Point(-2 * PolygonSize, 1 * PolygonSize)
+                        new Coordinate(-1 * PolygonSize, 1 * PolygonSize),
+                        new Coordinate(-1 * PolygonSize, 2 * PolygonSize),
+                        new Coordinate(-2 * PolygonSize, 2 * PolygonSize),
+                        new Coordinate(-2 * PolygonSize, 1 * PolygonSize)
                     }),
                     Styles = new[]
                     {
@@ -127,14 +124,14 @@ namespace Mapsui.Samples.Common.Maps
                         }
                     },
                 },
-                new Feature
+                new GeometryFeature
                 {
                     Geometry = new LineString(new[]
                     {
-                        new Point(-1 * PolygonSize, 1 * PolygonSize),
-                        new Point(-1 * PolygonSize, 2 * PolygonSize),
-                        new Point(-2 * PolygonSize, 2 * PolygonSize),
-                        new Point(-2 * PolygonSize, 1 * PolygonSize)
+                        new Coordinate(-1 * PolygonSize, 1 * PolygonSize),
+                        new Coordinate(-1 * PolygonSize, 2 * PolygonSize),
+                        new Coordinate(-2 * PolygonSize, 2 * PolygonSize),
+                        new Coordinate(-2 * PolygonSize, 1 * PolygonSize)
                     }),
                     Styles = new[]
                     {

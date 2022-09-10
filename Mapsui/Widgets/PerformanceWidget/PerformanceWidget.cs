@@ -1,7 +1,6 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using Mapsui.Geometries;
 
 namespace Mapsui.Widgets.PerformanceWidget
 {
@@ -27,12 +26,12 @@ namespace Mapsui.Widgets.PerformanceWidget
         /// <summary>
         /// Event handler which is called, when the button is touched
         /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         /// <summary>
         /// Event handler which is called, when the button is touched
         /// </summary>
-        public event EventHandler<WidgetTouchedEventArgs> WidgetTouched;
+        public event EventHandler<WidgetTouchedEventArgs>? WidgetTouched;
 
         private float _opacity = 0.8f;
 
@@ -51,7 +50,7 @@ namespace Mapsui.Widgets.PerformanceWidget
             }
         }
 
-        public override bool HandleWidgetTouched(INavigator navigator, Point position)
+        public override bool HandleWidgetTouched(INavigator navigator, MPoint position)
         {
             var args = new WidgetTouchedEventArgs(position);
 

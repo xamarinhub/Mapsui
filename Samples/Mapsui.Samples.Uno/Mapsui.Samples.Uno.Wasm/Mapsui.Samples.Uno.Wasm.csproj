@@ -1,8 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net5.0</TargetFramework>
-    <NoWarn>NU1701</NoWarn>
+    <TargetFramework>net6.0</TargetFramework>
+    <DefineConstants>$(DefineConstants);__WASM__</DefineConstants>
+    <WasmShellILLinkerEnabled>true</WasmShellILLinkerEnabled>
+    <WasmShellForceDisableWSL Condition="'$(OS)' != 'Unix' and ('$(CI)' == 'true' or '$(BUILD_BUILDID)' != '')">true</WasmShellForceDisableWSL>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)'=='Debug'">
     <MonoRuntimeDebuggerEnabled>true</MonoRuntimeDebuggerEnabled>
@@ -13,7 +16,11 @@
 		IL Linking is disabled in Debug configuration.
 		When building in Release, see https://platform.uno/docs/articles/features/using-il-linker-webassembly.html
 		-->
-    <WasmShellILLinkerEnabled>false</WasmShellILLinkerEnabled>
+    <WasmShellILLinkerEnabled>false</WasmShellILLinkerEnabled>    
+    <WasmShellMonoRuntimeExecutionMode>Interpreter</WasmShellMonoRuntimeExecutionMode>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <WasmShellMonoRuntimeExecutionMode>FullAOT</WasmShellMonoRuntimeExecutionMode>
   </PropertyGroup>
   <ItemGroup>
     <Content Include="Assets\SplashScreen.png" />
@@ -40,21 +47,37 @@
     <None Include="wwwroot\web.config" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Windows.Compatibility" Version="5.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="5.0.0" />
-    <PackageReference Include="Uno.Extensions.Logging.WebAssembly.Console" Version="1.0.1" />
-    <PackageReference Include="Uno.UI.WebAssembly" Version="3.10.11" />
-    <PackageReference Include="Uno.UI.RemoteControl" Version="3.10.11" Condition="'$(Configuration)'=='Debug'" />
-    <PackageReference Include="Uno.Wasm.Bootstrap" Version="3.0.0" />
-    <PackageReference Include="Uno.Wasm.Bootstrap.DevServer" Version="3.0.0" />
+    <!--Don't remove this Reference it is a workaround for Central Package Management-->
+    <PackageReference Include="Microsoft.Windows.Compatibility" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+    <PackageReference Include="Uno.Extensions.Logging.WebAssembly.Console" />
+    <PackageReference Include="Uno.UI.WebAssembly" />
+    <PackageReference Include="Uno.UI.RemoteControl" Condition="'$(Configuration)'=='Debug'" />
+    <PackageReference Include="Uno.UI.Adapter.Microsoft.Extensions.Logging" />
+    <PackageReference Include="Uno.Wasm.Bootstrap" />
+    <PackageReference Include="Uno.Wasm.Bootstrap.DevServer" />
+    <PackageReference Include="SkiaSharp.Views.Uno" />
+    <PackageReference Include="SkiaSharp.NativeAssets.WebAssembly" />
   </ItemGroup>
+
+  <!--Harfbuzz Sharp references Workaround for this issue-->
+  <!--https://github.com/mono/SkiaSharp/issues/1725-->
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Mapsui.Geometries\Mapsui.Geometries.csproj" />
+    <PackageReference Include="HarfBuzzSharp" />
+    <PackageReference Include="HarfBuzzSharp.NativeAssets.WebAssembly" />
+    <NativeFileReference Include="$(HarfBuzzSharpStaticLibraryPath)\2.8.2\*.a" />
+  </ItemGroup>
+
+  <ItemGroup>    
+    <ProjectReference Include="..\..\..\Mapsui.Nts\Mapsui.Nts.csproj" />
+    <ProjectReference Include="..\..\..\Mapsui.Tiling\Mapsui.Tiling.csproj" />
     <ProjectReference Include="..\..\..\Mapsui.Rendering.Skia\Mapsui.Rendering.Skia.csproj" />
     <ProjectReference Include="..\..\..\Mapsui.UI.Uno\Mapsui.UI.Uno.csproj" />
     <ProjectReference Include="..\..\..\Mapsui\Mapsui.csproj" />
     <ProjectReference Include="..\..\Mapsui.Samples.Common\Mapsui.Samples.Common.csproj" />
     <ProjectReference Include="..\..\Mapsui.Samples.CustomWidget\Mapsui.Samples.CustomWidget.csproj" />
   </ItemGroup>
-  <Import Project="..\Mapsui.Samples.Uno.Shared\Mapsui.Samples.Uno.Shared.projitems" Label="Shared" Condition="Exists('..\Mapsui.Samples.Uno.Shared\Mapsui.Samples.Uno.Shared.projitems')" />
+
+  <Import Project="..\Mapsui.Samples.Uno.Shared\Mapsui.Samples.Uno.Shared.projitems" Label="Shared" />
+
 </Project>

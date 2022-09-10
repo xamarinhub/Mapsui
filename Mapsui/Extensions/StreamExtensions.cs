@@ -1,4 +1,6 @@
-﻿using System.IO;
+﻿using System;
+using System.Diagnostics;
+using System.IO;
 using System.Text;
 
 namespace Mapsui.Extensions
@@ -8,6 +10,22 @@ namespace Mapsui.Extensions
         public static byte[] ToBytes(this Stream input)
         {
             using var ms = new MemoryStream();
+            
+            switch (input.GetType().Name)
+            {
+                case "ContentLengthReadStream":
+                    // not implemented
+                    break;
+                default:
+                    if (input.Position != 0)
+                    {
+                        // set position to 0 so that i can copy all the data
+                        input.Position = 0;
+                    }
+
+                    break;
+            }
+
             input.CopyTo(ms);
             return ms.ToArray();
         }
@@ -19,11 +37,16 @@ namespace Mapsui.Extensions
         /// <returns>true if is svg stream</returns>
         public static bool IsSvg(this Stream stream)
         {
-            byte[] buffer = new byte[5];
+            var buffer = new byte[5];
 
             stream.Position = 0;
             stream.Read(buffer, 0, 5);
             stream.Position = 0;
+
+            if (!buffer.IsXml())
+            {
+                return false;
+            }
 
             if (Encoding.UTF8.GetString(buffer, 0, 4).ToLowerInvariant().Equals("<svg"))
             {
@@ -36,6 +59,38 @@ namespace Mapsui.Extensions
                 {
                     return true;
                 }
+            }
+
+            return false;
+        }
+
+        /// <summary> Is Xml </summary>
+        /// <param name="stream">stream</param>
+        /// <returns>true if is xml</returns>
+        public static bool IsXml(this Stream stream)
+        {
+            var buffer = new byte[1];
+
+            stream.Position = 0;
+            stream.Read(buffer, 0, 5);
+            stream.Position = 0;
+
+            return IsXml(buffer);
+        }
+
+        /// <summary> true if is Xml </summary>
+        /// <param name="buffer">buffer</param>
+        /// <returns>true if is xml</returns>
+        public static bool IsXml(this byte[] buffer)
+        {
+            if (buffer.Length == 0)
+            {
+                return false;
+            }
+
+            if (Encoding.UTF8.GetString(buffer, 0, 1).ToLowerInvariant().Equals("<"))
+            {
+                return true;
             }
 
             return false;

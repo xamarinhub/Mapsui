@@ -8,10 +8,11 @@ namespace Mapsui.Styles
     /// </summary>
     public class BitmapRegistry
     {
-        private static BitmapRegistry _instance;
+        private static BitmapRegistry? _instance;
         private readonly IDictionary<int, object> _register = new Dictionary<int, object>();
-        private BitmapRegistry() {}
-        private int _counter;
+        private readonly IDictionary<string, int> _lookup = new Dictionary<string, int>();
+        private BitmapRegistry() { }
+        private int _counter = 1;
 
         /// <summary>
         /// Singleton of BitmapRegistry class
@@ -22,24 +23,30 @@ namespace Mapsui.Styles
         /// Register a new bitmap
         /// </summary>
         /// <param name="bitmapData">Bitmap data to register</param>
+        /// <param name="key">key for accessing bitmap</param>
         /// <returns>Id of registered bitmap data</returns>
-        public int Register(object bitmapData)
+        public int Register(object bitmapData, string? key = null)
         {
             CheckBitmapData(bitmapData);
 
             var id = _counter;
             _counter++;
             _register[id] = bitmapData;
+            if (key != null)
+            {
+                _lookup[key] = id;
+            }
             return id;
         }
 
-        /// <summary>
-        /// Unregister an existing bitmap
-        /// </summary>
+        /// <summary> Unregister an existing bitmap </summary>
         /// <param name="id">Id of registered bitmap data</param>
-        public void Unregister(int id)
+        /// <returns>The unregistered object</returns>
+        public object? Unregister(int id)
         {
+            _register.TryGetValue(id, out var val);
             _register.Remove(id);
+            return val;
         }
 
         /// <summary>
@@ -86,6 +93,15 @@ namespace Mapsui.Styles
                     throw new ArgumentException("Sprite has no corresponding atlas bitmap.");
                 }
             }
+        }
+
+        /// <summary> Try Get Bitmap Id </summary>
+        /// <param name="key">key</param>
+        /// <param name="bitmapId">bitmap id</param>
+        /// <returns>true if found</returns>
+        public bool TryGetBitmapId(string key, out int bitmapId)
+        {
+            return _lookup.TryGetValue(key, out bitmapId);
         }
     }
 }

@@ -2,16 +2,15 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
+using Mapsui.Animations;
 using Mapsui.Fetcher;
-using Mapsui.Geometries;
 using Mapsui.Layers;
-using Mapsui.Projection;
 using Mapsui.Styles;
 using Mapsui.Widgets;
 
 namespace Mapsui
 {
-    public interface IMap
+    public interface IMap : IAnimatable
     {
         /// <summary>
         /// List of Widgets belonging to map
@@ -21,12 +20,7 @@ namespace Mapsui
         /// <summary>
         /// Projection type of Map. Normally in format like "EPSG:3857"
         /// </summary>
-        string CRS { get; set; }
-
-        /// <summary>
-        /// Transformation to use for the different coordinate systems
-        /// </summary>
-        ITransformation Transformation { get; set; }
+        string? CRS { get; set; }
 
         /// <summary>
         /// A collection of layers. The first layer in the list is drawn first, the last one on top.
@@ -39,10 +33,10 @@ namespace Mapsui
         Color BackColor { get; set; }
 
         /// <summary>
-        /// Gets the extents of the map based on the extents of all the layers in the layers collection
+        /// Gets the extent of the map based on the extent of all the layers in the layers collection
         /// </summary>
-        /// <returns>Full map extents</returns>
-        BoundingBox Envelope { get; }
+        /// <returns>Full map extent</returns>
+        MRect? Extent { get; }
 
         /// <summary>
         /// List of all native resolutions of this map
@@ -71,6 +65,6 @@ namespace Mapsui
         /// </summary>
         void ClearCache();
 
-        void RefreshData(BoundingBox extent, double resolution, ChangeType changeType);
+        void RefreshData(FetchInfo fetchInfo);
     }
 }

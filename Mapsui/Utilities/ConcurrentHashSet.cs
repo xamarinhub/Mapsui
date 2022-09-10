@@ -2,6 +2,7 @@
 // https://github.com/i3arnon/ConcurrentHashSet
 // because with nuget package it resulted in an error on the build server
 
+using Mapsui.Logging;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -151,7 +152,7 @@ namespace ConcurrentCollections
         /// </summary>
         /// <param name="comparer">The <see cref="T:System.Collections.Generic.IEqualityComparer{T}"/>
         /// implementation to use when comparing items.</param>
-        public ConcurrentHashSet(IEqualityComparer<T> comparer)
+        public ConcurrentHashSet(IEqualityComparer<T>? comparer)
             : this(DefaultConcurrencyLevel, DefaultCapacity, true, comparer)
         {
         }
@@ -172,7 +173,7 @@ namespace ConcurrentCollections
         /// <exception cref="T:System.ArgumentNullException"><paramref name="collection"/> is a null reference
         /// (Nothing in Visual Basic).
         /// </exception>
-        public ConcurrentHashSet(IEnumerable<T> collection, IEqualityComparer<T> comparer)
+        public ConcurrentHashSet(IEnumerable<T> collection, IEqualityComparer<T>? comparer)
             : this(comparer)
         {
             if (collection == null) throw new ArgumentNullException(nameof(collection));
@@ -228,7 +229,7 @@ namespace ConcurrentCollections
         {
         }
 
-        private ConcurrentHashSet(int concurrencyLevel, int capacity, bool growLockArray, IEqualityComparer<T> comparer)
+        private ConcurrentHashSet(int concurrencyLevel, int capacity, bool growLockArray, IEqualityComparer<T>? comparer)
         {
             if (concurrencyLevel < 1) throw new ArgumentOutOfRangeException(nameof(concurrencyLevel));
             if (capacity < 0) throw new ArgumentOutOfRangeException(nameof(capacity));
@@ -263,8 +264,13 @@ namespace ConcurrentCollections
         /// successfully; false if it already exists.</returns>
         /// <exception cref="T:System.OverflowException">The <see cref="ConcurrentHashSet{T}"/>
         /// contains too many items.</exception>
-        public bool Add(T item) =>
-            AddInternal(item, _comparer.GetHashCode(item), true);
+        public bool Add(T item)
+        {
+            if (item == null)
+                return false;
+            
+            return AddInternal(item, _comparer.GetHashCode(item), true);
+        }
 
         /// <summary>
         /// Removes all items from the <see cref="ConcurrentHashSet{T}"/>.
@@ -294,6 +300,9 @@ namespace ConcurrentCollections
         /// <returns>true if the <see cref="ConcurrentHashSet{T}"/> contains the item; otherwise, false.</returns>
         public bool Contains(T item)
         {
+            if (item == null)
+                return false;
+            
             var hashcode = _comparer.GetHashCode(item);
 
             // We must capture the _buckets field in a local variable. It is set to a new table on each table resize.
@@ -324,12 +333,15 @@ namespace ConcurrentCollections
         /// <returns>true if an item was removed successfully; otherwise, false.</returns>
         public bool TryRemove(T item)
         {
+            if (item == null)
+                return false;
+            
             var hashcode = _comparer.GetHashCode(item);
             while (true)
             {
                 var tables = _tables;
 
-                GetBucketAndLockNo(hashcode, out int bucketNo, out int lockNo, tables.Buckets.Length, tables.Locks.Length);
+                GetBucketAndLockNo(hashcode, out var bucketNo, out var lockNo, tables.Buckets.Length, tables.Locks.Length);
 
                 lock (tables.Locks[lockNo])
                 {
@@ -340,10 +352,10 @@ namespace ConcurrentCollections
                         continue;
                     }
 
-                    Node previous = null;
+                    Node? previous = null;
                     for (var current = tables.Buckets[bucketNo]; current != null; current = current.Next)
                     {
-                        Debug.Assert((previous == null && current == tables.Buckets[bucketNo]) || previous.Next == current);
+                        Debug.Assert((previous == null && current == tables.Buckets[bucketNo]) || previous?.Next == current);
 
                         if (hashcode == current.Hashcode && _comparer.Equals(current.Item, item))
                         {
@@ -367,7 +379,10 @@ namespace ConcurrentCollections
             }
         }
 
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
 
         /// <summary>Returns an enumerator that iterates through the <see
         /// cref="ConcurrentHashSet{T}"/>.</summary>
@@ -395,7 +410,10 @@ namespace ConcurrentCollections
             }
         }
 
-        void ICollection<T>.Add(T item) => Add(item);
+        void ICollection<T>.Add(T item)
+        {
+            Add(item);
+        }
 
         bool ICollection<T>.IsReadOnly => false;
 
@@ -429,12 +447,21 @@ namespace ConcurrentCollections
             }
         }
 
-        bool ICollection<T>.Remove(T item) => TryRemove(item);
+        bool ICollection<T>.Remove(T item)
+        {
+            if (item == null)
+                return false;
+            
+            return TryRemove(item);
+        }
 
         private void InitializeFromCollection(IEnumerable<T> collection)
         {
             foreach (var item in collection)
             {
+                if (item == null)
+                    continue;
+                
                 AddInternal(item, _comparer.GetHashCode(item), false);
             }
 
@@ -450,7 +477,7 @@ namespace ConcurrentCollections
             {
                 var tables = _tables;
 
-                GetBucketAndLockNo(hashcode, out int bucketNo, out int lockNo, tables.Buckets.Length, tables.Locks.Length);
+                GetBucketAndLockNo(hashcode, out var bucketNo, out var lockNo, tables.Buckets.Length, tables.Locks.Length);
 
                 var resizeDesired = false;
                 var lockTaken = false;
@@ -467,10 +494,10 @@ namespace ConcurrentCollections
                     }
 
                     // Try to find this item in the bucket
-                    Node previous = null;
+                    Node? previous = null;
                     for (var current = tables.Buckets[bucketNo]; current != null; current = current.Next)
                     {
-                        Debug.Assert(previous == null && current == tables.Buckets[bucketNo] || previous.Next == current);
+                        Debug.Assert(previous == null && current == tables.Buckets[bucketNo] || previous?.Next == current);
                         if (hashcode == current.Hashcode && _comparer.Equals(current.Item, item))
                         {
                             return false;
@@ -598,8 +625,9 @@ namespace ConcurrentCollections
                         }
                     }
                 }
-                catch (OverflowException)
+                catch (OverflowException ex)
                 {
+                    Logger.Log(LogLevel.Error, ex.Message, ex);
                     maximizeTableSize = true;
                 }
 
@@ -641,7 +669,7 @@ namespace ConcurrentCollections
                     while (current != null)
                     {
                         var next = current.Next;
-                        GetBucketAndLockNo(current.Hashcode, out int newBucketNo, out int newLockNo, newBuckets.Length, newLocks.Length);
+                        GetBucketAndLockNo(current.Hashcode, out var newBucketNo, out var newLockNo, newBuckets.Length, newLocks.Length);
 
                         newBuckets[newBucketNo] = new Node(current.Item, current.Hashcode, newBuckets[newBucketNo]);
 

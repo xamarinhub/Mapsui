@@ -1,15 +1,16 @@
 ﻿using System.Collections.Generic;
 using System.Reflection;
-using Mapsui.Geometries;
+using Mapsui.Extensions;
 using Mapsui.Layers;
 using Mapsui.Providers;
 using Mapsui.Samples.Common;
 using Mapsui.Styles;
 using Mapsui.UI;
+using Mapsui.Utilities;
 
 namespace Mapsui.Tests.Common.Maps
 {
-    public class BitmapSymbolSample : ISample
+    public class BitmapSymbolSample : IMapControlSample
     {
         public string Name => "Bitmap Symbol";
         public string Category => "Tests";
@@ -21,54 +22,48 @@ namespace Mapsui.Tests.Common.Maps
 
         public static Map CreateMap()
         {
-            var map = new Map
-            {
-                BackColor = Color.Transparent,
-                Home = n => n.NavigateTo(new Point(100, 100), 1)
-            };
-            map.Layers.Add(new MemoryLayer
+            var layer = new MemoryLayer
             {
                 Style = null,
-                DataSource = new MemoryProvider<IGeometryFeature>(CreateFeatures()),
+                Features = CreateFeatures(),
                 Name = "Points with bitmaps"
-            });
+            };
+
+            var map = new Map
+            {
+                BackColor = Color.FromString("WhiteSmoke"),
+                Home = n => n.NavigateTo(layer.Extent!.Grow(layer.Extent.Width * 2))
+            };
+
+            map.Layers.Add(layer);
+
             return map;
         }
 
-        public static IEnumerable<IGeometryFeature> CreateFeatures()
+        public static IEnumerable<IFeature> CreateFeatures()
         {
-            var circleIconId = LoadBitmap("Mapsui.Tests.Common.Resources.Images.circle.png");
-            var checkeredIconId = LoadBitmap("Mapsui.Tests.Common.Resources.Images.checkered.png");
+            var circleIconId = typeof(BitmapSymbolSample).LoadBitmapId("Resources.Images.circle.png");
+            var checkeredIconId = typeof(BitmapSymbolSample).LoadBitmapId("Resources.Images.checkered.png");
 
-            return new List<IGeometryFeature>
+            return new List<IFeature>
             {
-                new Feature
+                new PointFeature(new MPoint(50, 50))
                 {
-                    Geometry = new Point(50, 50),
                     Styles = new[] {new VectorStyle {Fill = new Brush(Color.Red)}}
                 },
-                new Feature
+                new PointFeature(new MPoint(50, 100))
                 {
-                    Geometry = new Point(50, 100),
-                    Styles = new[] {new SymbolStyle {BitmapId = circleIconId}}
+                    Styles = new[] {new SymbolStyle { BitmapId = circleIconId}}
                 },
-                new Feature
+                new PointFeature(new MPoint(100, 50))
                 {
-                    Geometry = new Point(100, 50),
-                    Styles = new[] {new SymbolStyle {BitmapId = checkeredIconId}}
+                    Styles = new[] {new SymbolStyle { BitmapId = checkeredIconId}}
                 },
-                new Feature
+                new PointFeature(new MPoint(100, 100))
                 {
-                    Geometry = new Point(100, 100),
                     Styles = new[] {new VectorStyle {Fill = new Brush(Color.Green), Outline = null}}
                 }
             };
-        }
-
-        private static int LoadBitmap(string bitmapPath)
-        {
-            var bitmapStream = typeof(Utilities).GetTypeInfo().Assembly.GetManifestResourceStream(bitmapPath);
-            return BitmapRegistry.Instance.Register(bitmapStream);
         }
     }
 }

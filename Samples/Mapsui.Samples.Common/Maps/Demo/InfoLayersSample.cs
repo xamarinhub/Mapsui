@@ -1,15 +1,21 @@
-﻿using System.Collections.Generic;
-using Mapsui.Geometries;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Mapsui.Layers;
+using Mapsui.Nts;
 using Mapsui.Providers;
 using Mapsui.Samples.Common.Helpers;
 using Mapsui.Styles;
+using Mapsui.Tiling;
 using Mapsui.UI;
-using Mapsui.Utilities;
+using NetTopologySuite.Geometries;
+
+#pragma warning disable CS8670 // Object or collection initializer implicitly dereferences possibly null member.
+#pragma warning disable IDISP004 // Don't ignore created IDisposable
 
 namespace Mapsui.Samples.Common.Maps
 {
-    public class InfoLayersSample : ISample
+    public class InfoLayersSample : ISample, ISampleTest
     {
         private const string InfoLayerName = "Info Layer";
         private const string PolygonLayerName = "Polygon Layer";
@@ -17,33 +23,33 @@ namespace Mapsui.Samples.Common.Maps
 
         public string Name => "2 Map Info";
         public string Category => "Demo";
-        public void Setup(IMapControl mapControl)
-        {
-            mapControl.Map = CreateMap();
-        }
 
         public static Map CreateMap()
         {
             var map = new Map();
 
             map.Layers.Add(OpenStreetMap.CreateTileLayer());
-            map.Layers.Add(CreateInfoLayer(map.Envelope));
+            map.Layers.Add(CreateInfoLayer(map.Extent));
             map.Layers.Add(CreatePolygonLayer());
             map.Layers.Add(new WritableLayer());
             map.Layers.Add(CreateLineLayer());
-            
+
             return map;
+        }
+
+        public Task<Map> CreateMapAsync()
+        {
+            return Task.FromResult(CreateMap());
         }
 
         private static ILayer CreatePolygonLayer()
         {
-            var features = new List<IGeometryFeature> { CreatePolygonFeature(), CreateMultiPolygonFeature() };
-            var provider = new MemoryProvider<IGeometryFeature>(features);
+            var features = new List<IFeature> { CreatePolygonFeature(), CreateMultiPolygonFeature() };
 
             var layer = new MemoryLayer
             {
                 Name = PolygonLayerName,
-                DataSource = provider,
+                Features = features,
                 Style = null,
                 IsMapInfoLayer = true
             };
@@ -56,15 +62,15 @@ namespace Mapsui.Samples.Common.Maps
             return new MemoryLayer
             {
                 Name = LineLayerName,
-                DataSource = new MemoryProvider<IGeometryFeature>(CreateLineFeature()),
+                Features = new[] { CreateLineFeature() },
                 Style = null,
                 IsMapInfoLayer = true
             };
         }
 
-        private static Feature CreateMultiPolygonFeature()
+        private static GeometryFeature CreateMultiPolygonFeature()
         {
-            var feature = new Feature
+            var feature = new GeometryFeature
             {
                 Geometry = CreateMultiPolygon(),
                 ["Name"] = "Multipolygon 1"
@@ -73,9 +79,9 @@ namespace Mapsui.Samples.Common.Maps
             return feature;
         }
 
-        private static Feature CreatePolygonFeature()
+        private static GeometryFeature CreatePolygonFeature()
         {
-            var feature = new Feature
+            var feature = new GeometryFeature
             {
                 Geometry = CreatePolygon(),
                 ["Name"] = "Polygon 1"
@@ -84,52 +90,46 @@ namespace Mapsui.Samples.Common.Maps
             return feature;
         }
 
-        private static Feature CreateLineFeature()
+        private static GeometryFeature CreateLineFeature()
         {
-            return new Feature
+            return new GeometryFeature
             {
                 Geometry = CreateLine(),
                 ["Name"] = "Line 1",
-                Styles = new List<IStyle> { new VectorStyle{ Line = new Pen(Color.Violet, 6)}}
+                Styles = new List<IStyle> { new VectorStyle { Line = new Pen(Color.Violet, 6) } }
             };
         }
 
         private static MultiPolygon CreateMultiPolygon()
         {
-            return new MultiPolygon
-            {
-                Polygons = new List<Polygon>
-                {
-                    new Polygon(new LinearRing(new[]
-                    {
-                        new Point(4000000, 3000000),
-                        new Point(4000000, 2000000),
-                        new Point(3000000, 2000000),
-                        new Point(3000000, 3000000),
-                        new Point(4000000, 3000000)
-                    })),
+            return new MultiPolygon(new[] {
+                new Polygon(new LinearRing(new[] {
+                    new Coordinate(4000000, 3000000),
+                    new Coordinate(4000000, 2000000),
+                    new Coordinate(3000000, 2000000),
+                    new Coordinate(3000000, 3000000),
+                    new Coordinate(4000000, 3000000)
+                })),
 
-                    new Polygon(new LinearRing(new[]
-                    {
-                        new Point(4000000, 5000000),
-                        new Point(4000000, 4000000),
-                        new Point(3000000, 4000000),
-                        new Point(3000000, 5000000),
-                        new Point(4000000, 5000000)
-                    }))
-                }
-            };
+                new(new LinearRing(new[] {
+                    new Coordinate(4000000, 5000000),
+                    new Coordinate(4000000, 4000000),
+                    new Coordinate(3000000, 4000000),
+                    new Coordinate(3000000, 5000000),
+                    new Coordinate(4000000, 5000000)
+                }))
+            });
         }
 
         private static Polygon CreatePolygon()
         {
             return new Polygon(new LinearRing(new[]
             {
-                new Point(1000000, 1000000),
-                new Point(1000000, -1000000),
-                new Point(-1000000, -1000000),
-                new Point(-1000000, 1000000),
-                new Point(1000000, 1000000)
+                new Coordinate(1000000, 1000000),
+                new Coordinate(1000000, -1000000),
+                new Coordinate(-1000000, -1000000),
+                new Coordinate(-1000000, 1000000),
+                new Coordinate(1000000, 1000000)
             }));
         }
 
@@ -141,19 +141,21 @@ namespace Mapsui.Samples.Common.Maps
 
             return new LineString(new[]
             {
-                new Point(offsetX + stepSize,      offsetY + stepSize),
-                new Point(offsetX + stepSize * 2,  offsetY + stepSize),
-                new Point(offsetX + stepSize * 2,  offsetY + stepSize * 2),
-                new Point(offsetX + stepSize * 3,  offsetY + stepSize * 2),
-                new Point(offsetX + stepSize * 3,  offsetY + stepSize * 3)
+                new Coordinate(offsetX + stepSize,      offsetY + stepSize),
+                new Coordinate(offsetX + stepSize * 2,  offsetY + stepSize),
+                new Coordinate(offsetX + stepSize * 2,  offsetY + stepSize * 2),
+                new Coordinate(offsetX + stepSize * 3,  offsetY + stepSize * 2),
+                new Coordinate(offsetX + stepSize * 3,  offsetY + stepSize * 3)
             });
         }
 
-        private static ILayer CreateInfoLayer(BoundingBox envelope)
+        private static ILayer CreateInfoLayer(MRect? envelope)
         {
+            var random = new Random(7);
+
             return new Layer(InfoLayerName)
             {
-                DataSource = RandomPointHelper.CreateProviderWithRandomPoints(envelope, 25, 7),
+                DataSource = RandomPointGenerator.CreateProviderWithRandomPoints(envelope, 25, random),
                 Style = CreateSymbolStyle(),
                 IsMapInfoLayer = true
             };
@@ -167,6 +169,11 @@ namespace Mapsui.Samples.Common.Maps
                 Fill = new Brush(new Color(213, 234, 194)),
                 Outline = { Color = Color.Gray, Width = 1 }
             };
+        }
+
+        public async Task InitializeTestAsync()
+        {
+            await Task.Delay(1000).ConfigureAwait(true);
         }
     }
 }

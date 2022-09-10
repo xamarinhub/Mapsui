@@ -1,13 +1,16 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
+using Mapsui.Extensions;
 using Mapsui.Layers;
-using Mapsui.Projection;
+using Mapsui.Projections;
 using Mapsui.Providers;
 using Mapsui.Styles;
+using Mapsui.Tiling;
 using Mapsui.UI;
-using Mapsui.Utilities;
 using Newtonsoft.Json;
 
 // ReSharper disable UnusedAutoPropertyAccessor.Local
@@ -19,19 +22,14 @@ namespace Mapsui.Samples.Common.Maps
         public string Name => "1 Points";
         public string Category => "Geometries";
 
-        public void Setup(IMapControl mapControl)
-        {
-            mapControl.Map = CreateMap();
-        }
-
-        public static Map CreateMap()
+        public Task<Map> CreateMapAsync()
         {
             var map = new Map();
 
             map.Layers.Add(OpenStreetMap.CreateTileLayer());
             map.Layers.Add(CreatePointLayer());
-            map.Home = n => n.NavigateTo(map.Layers[1].Envelope.Centroid, map.Resolutions[5]);
-            return map;
+            map.Home = n => n.NavigateTo(map.Layers[1].Extent!.Centroid, map.Resolutions[5]);
+            return Task.FromResult(map);
         }
 
         private static MemoryLayer CreatePointLayer()
@@ -39,24 +37,21 @@ namespace Mapsui.Samples.Common.Maps
             return new MemoryLayer
             {
                 Name = "Points",
-                IsMapInfoLayer=true,
-                DataSource = new MemoryProvider<IGeometryFeature>(GetCitiesFromEmbeddedResource()),
+                IsMapInfoLayer = true,
+                Features = GetCitiesFromEmbeddedResource(),
                 Style = CreateBitmapStyle()
             };
         }
 
-        private static IEnumerable<IGeometryFeature> GetCitiesFromEmbeddedResource()
+        private static IEnumerable<IFeature> GetCitiesFromEmbeddedResource()
         {
             var path = "Mapsui.Samples.Common.EmbeddedResources.congo.json";
             var assembly = typeof(PointsSample).GetTypeInfo().Assembly;
-            var stream = assembly.GetManifestResourceStream(path);
+            using var stream = assembly.GetManifestResourceStream(path) ?? throw new InvalidOperationException($"{path} not found");
             var cities = DeserializeFromStream<City>(stream);
-            
-            return cities.Select(c =>
-            {
-                var feature = new Feature();
-                var point = SphericalMercator.FromLonLat(c.Lng, c.Lat);
-                feature.Geometry = point;
+
+            return cities.Select(c => {
+                var feature = new PointFeature(SphericalMercator.FromLonLat(c.Lng, c.Lat).ToMPoint());
                 feature["name"] = c.Name;
                 feature["country"] = c.Country;
                 return feature;
@@ -65,8 +60,8 @@ namespace Mapsui.Samples.Common.Maps
 
         private class City
         {
-            public string Country { get; set; }
-            public string Name { get; set; }
+            public string? Country { get; set; }
+            public string? Name { get; set; }
             public double Lat { get; set; }
             public double Lng { get; set; }
         }
@@ -75,10 +70,10 @@ namespace Mapsui.Samples.Common.Maps
         {
             var serializer = new JsonSerializer();
 
-            using (var sr = new StreamReader(stream))
+            using (var sr = new System.IO.StreamReader(stream))
             using (var jsonTextReader = new JsonTextReader(sr))
             {
-                return serializer.Deserialize<List<T>>(jsonTextReader);
+                return serializer.Deserialize<List<T>>(jsonTextReader) ?? new List<T>();
             }
         }
 
@@ -87,17 +82,9 @@ namespace Mapsui.Samples.Common.Maps
             // For this sample we get the bitmap from an embedded resouce
             // but you could get the data stream from the web or anywhere
             // else.
-            var path = "Mapsui.Samples.Common.Images.home.png"; // Designed by Freepik http://www.freepik.com
-            var bitmapId = GetBitmapIdForEmbeddedResource(path);
+            var bitmapId = typeof(PointsSample).LoadBitmapId(@"Images.home.png"); // Designed by Freepik http://www.freepik.com
             var bitmapHeight = 176; // To set the offset correct we need to know the bitmap height
             return new SymbolStyle { BitmapId = bitmapId, SymbolScale = 0.20, SymbolOffset = new Offset(0, bitmapHeight * 0.5) };
-        }
-
-        private static int GetBitmapIdForEmbeddedResource(string imagePath)
-        {
-            var assembly = typeof(PointsSample).GetTypeInfo().Assembly;
-            var image = assembly.GetManifestResourceStream(imagePath);
-            return BitmapRegistry.Instance.Register(image);
         }
     }
 }

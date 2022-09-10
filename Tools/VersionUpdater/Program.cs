@@ -11,7 +11,7 @@ namespace VersionUpdater
     public class Options
     {
         [Option('v', Required = true, HelpText = "Specifies the version to set in semver format")]
-        public string Version { get; set; }
+        public string Version { get; set; } = "4.0.0"; // current version of mapsui is 4.0.0 set it as default
     }
 
     static class Program
@@ -19,8 +19,7 @@ namespace VersionUpdater
         static void Main(string[] args)
         {
             Parser.Default.ParseArguments<Options>(args)
-                .WithParsed(o =>
-                {
+                .WithParsed(o => {
                     var version = Version.Parse(o.Version);
 
                     Console.WriteLine($"{nameof(version.FullVersion)}: {version.FullVersion}");

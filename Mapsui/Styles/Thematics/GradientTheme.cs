@@ -1,22 +1,10 @@
-// Copyright 2005, 2006 - Morten Nielsen (www.iter.dk)
-//
-// This file is part of SharpMap.
-// Mapsui is free software; you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation; either version 2 of the License, or
-// (at your option) any later version.
-// 
-// SharpMap is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU Lesser General Public License for more details.
+// Copyright (c) The Mapsui authors.
+// The Mapsui authors licensed this file under the MIT license.
+// See the LICENSE file in the project root for full license information.
 
-// You should have received a copy of the GNU Lesser General Public License
-// along with SharpMap; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA 
+// This file was originally created by Morten Nielsen (www.iter.dk) as part of SharpMap
 
 using System;
-using Mapsui.Providers;
 
 namespace Mapsui.Styles.Thematics
 {
@@ -53,17 +41,17 @@ namespace Mapsui.Styles.Thematics
         /// <summary>
         /// Gets or sets the <see cref="Mapsui.Styles.Thematics.ColorBlend"/> used on labels
         /// </summary>
-        public ColorBlend TextColorBlend { get; set; }
+        public ColorBlend? TextColorBlend { get; set; }
 
         /// <summary>
         /// Gets or sets the <see cref="Mapsui.Styles.Thematics.ColorBlend"/> used on lines
         /// </summary>
-        public ColorBlend LineColorBlend { get; set; }
+        public ColorBlend? LineColorBlend { get; set; }
 
         /// <summary>
         /// Gets or sets the <see cref="Mapsui.Styles.Thematics.ColorBlend"/> used as Fill
         /// </summary>
-        public ColorBlend FillColorBlend { get; set; }
+        public ColorBlend? FillColorBlend { get; set; }
 
         /// <summary>
         /// Initializes a new instance of the GradientTheme class
@@ -116,14 +104,14 @@ namespace Mapsui.Styles.Thematics
             MinStyle = minStyle;
         }
 
-        
+
         /// <summary>
         /// Returns the style based on a numeric DataColumn, where style
         /// properties are linearly interpolated between max and min values.
         /// </summary>
         /// <param name="row">Feature</param>
         /// <returns><see cref="Mapsui.Styles.IStyle">Style</see> calculated by a linear interpolation between the min/max styles</returns>
-        public IStyle GetStyle(IFeature row)
+        public IStyle? GetStyle(IFeature row)
         {
             double attr;
             try { attr = Convert.ToDouble(row[ColumnName.ToUpper()]); }
@@ -132,67 +120,73 @@ namespace Mapsui.Styles.Thematics
                 throw new ArgumentException("MinStyle and MaxStyle must be of the same type");
 
 
-            var style = (IStyle)Activator.CreateInstance(MinStyle.GetType());
+            var style = (IStyle)Activator.CreateInstance(MinStyle.GetType())!;
             if (MinStyle is LabelStyle && MaxStyle is LabelStyle)
                 CalculateLabelStyle(style as LabelStyle, MinStyle as LabelStyle, MaxStyle as LabelStyle, attr);
-            if (MinStyle is VectorStyle && MaxStyle is VectorStyle) 
+            if (MinStyle is VectorStyle && MaxStyle is VectorStyle)
                 CalculateVectorStyle(style as VectorStyle, MinStyle as VectorStyle, MaxStyle as VectorStyle, attr);
             if (MinStyle is SymbolStyle && MaxStyle is SymbolStyle)
                 CalculateSymbolStyle(style as SymbolStyle, MinStyle as SymbolStyle, MaxStyle as SymbolStyle, attr);
             return style;
         }
 
-        private void CalculateVectorStyle(VectorStyle style, VectorStyle min, VectorStyle max, double value)
+        private void CalculateVectorStyle(VectorStyle? style, VectorStyle? min, VectorStyle? max, double value)
         {
-            double dFrac = Fraction(value);
+            if (style == null)
+                return;
+            var dFrac = Fraction(value);
             double fFrac = Convert.ToSingle(dFrac);
-            style.Enabled = (dFrac > 0.5 ? min.Enabled : max.Enabled);
+            style.Enabled = (dFrac > 0.5 ? min?.Enabled ?? false : max?.Enabled ?? false);
             if (FillColorBlend != null)
                 style.Fill = new Brush { Color = FillColorBlend.GetColor(fFrac) };
-            else if (min.Fill != null && max.Fill != null)
+            else if (min?.Fill != null && max?.Fill != null)
                 style.Fill = InterpolateBrush(min.Fill, max.Fill, value);
 
-            if (min.Line != null && max.Line != null)
+            if (min?.Line != null && max?.Line != null)
                 style.Line = InterpolatePen(min.Line, max.Line, value);
-            if (LineColorBlend != null)
+            if (LineColorBlend != null && style.Line != null)
                 style.Line.Color = LineColorBlend.GetColor(fFrac);
 
-            if (min.Outline != null && max.Outline != null)
+            if (min?.Outline != null && max?.Outline != null)
                 style.Outline = InterpolatePen(min.Outline, max.Outline, value);
         }
 
-        private void CalculateSymbolStyle(SymbolStyle style, SymbolStyle min, SymbolStyle max, double value)
+        private void CalculateSymbolStyle(SymbolStyle? style, SymbolStyle? min, SymbolStyle? max, double value)
         {
-            double dFrac = Fraction(value);
-            style.BitmapId = (dFrac > 0.5) ? min.BitmapId : max.BitmapId;
-            style.SymbolOffset = (dFrac > 0.5 ? min.SymbolOffset : max.SymbolOffset);
+            if (style == null)
+                return;
+            var dFrac = Fraction(value);
+            style.BitmapId = (dFrac > 0.5) ? min?.BitmapId ?? 0 : max?.BitmapId ?? 0;
+            style.SymbolOffset = (dFrac > 0.5 ? min?.SymbolOffset ?? new Offset() : max?.SymbolOffset ?? new Offset());
             //We don't interpolate the offset but let it follow the symbol instead
-            style.SymbolScale = InterpolateDouble(min.SymbolScale, max.SymbolScale, value);
+            style.SymbolScale = InterpolateDouble(min?.SymbolScale, max?.SymbolScale, value);
         }
 
-        private void CalculateLabelStyle(LabelStyle style, LabelStyle min, LabelStyle max, double value)
+        private void CalculateLabelStyle(LabelStyle? style, LabelStyle? min, LabelStyle? max, double value)
         {
-            style.CollisionDetection = min.CollisionDetection;
-            style.Enabled = InterpolateBool(min.Enabled, max.Enabled, value);
-            style.LabelColumn = InterpolateString(min.LabelColumn, max.LabelColumn, value);
+            if (style == null)
+                return;
+            style.CollisionDetection = min?.CollisionDetection ?? false;
+            style.Enabled = InterpolateBool(min?.Enabled ?? false, max?.Enabled ?? false, value);
+            style.LabelColumn = InterpolateString(min?.LabelColumn, max?.LabelColumn, value);
 
-            double fontSize = InterpolateDouble(min.Font.Size, max.Font.Size, value);
-            style.Font = new Font { FontFamily = min.Font.FontFamily, Size = fontSize };
+            var fontSize = InterpolateDouble(min?.Font.Size, max?.Font.Size, value);
+            style.Font = new Font { FontFamily = min?.Font.FontFamily, Size = fontSize };
 
-            if (min.BackColor != null && max.BackColor != null)
+            if (min?.BackColor != null && max?.BackColor != null)
                 style.BackColor = InterpolateBrush(min.BackColor, max.BackColor, value);
 
-            style.ForeColor = TextColorBlend == null ? 
-                InterpolateColor(min.ForeColor, max.ForeColor, value) : 
-                LineColorBlend.GetColor(Convert.ToSingle(Fraction(value)));
+            style.ForeColor = TextColorBlend == null ?
+                InterpolateColor(min?.ForeColor, max?.ForeColor, value) :
+                TextColorBlend.GetColor(Convert.ToSingle(Fraction(value)));
 
-            if (min.Halo != null && max.Halo != null)
+            if (min?.Halo != null && max?.Halo != null)
                 style.Halo = InterpolatePen(min.Halo, max.Halo, value);
 
-            var x = InterpolateDouble(min.Offset.X, max.Offset.X, value);
-            var y = InterpolateDouble(min.Offset.Y, max.Offset.Y, value);
+            var x = InterpolateDouble(min?.Offset.X, max?.Offset.X, value);
+            var y = InterpolateDouble(min?.Offset.Y, max?.Offset.Y, value);
             style.Offset = new Offset { X = x, Y = y };
-            style.LabelColumn = min.LabelColumn;
+            style.LabelColumn = min?.LabelColumn;
         }
 
         private double Fraction(double attr)
@@ -208,22 +202,21 @@ namespace Mapsui.Styles.Thematics
             return frac > 0.5 ? max : min;
         }
 
-        private string InterpolateString(string min, string max, double attr)
+        private string? InterpolateString(string? min, string? max, double attr)
         {
             var frac = Fraction(attr);
             return frac > 0.5 ? max : min;
         }
 
-        private double InterpolateDouble(double min, double max, double attr)
+        private double InterpolateDouble(double? min, double? max, double attr)
         {
-            return (max - min) * Fraction(attr) + min;
+            min ??= 0;
+            max ??= 0;
+            return (max.Value - min.Value) * Fraction(attr) + min.Value;
         }
 
         private Brush InterpolateBrush(Brush min, Brush max, double attr)
         {
-            if (min.GetType() != typeof(Brush) || max.GetType() != typeof(Brush))
-                throw (new ArgumentException("Only Brush brushes are supported in GradientTheme"));
-
             return new Brush { Color = InterpolateColor(min.Color, max.Color, attr) };
         }
 
@@ -236,18 +229,21 @@ namespace Mapsui.Styles.Thematics
             };
         }
 
-        private Color InterpolateColor(Color minCol, Color maxCol, double attr)
+        private Color InterpolateColor(Color? minCol, Color? maxCol, double attr)
         {
-            double frac = Fraction(attr);
+            minCol ??= Color.Transparent;
+            maxCol ??= Color.Transparent;
+
+            var frac = Fraction(attr);
             if (Math.Abs(frac - 1) < Utilities.Constants.Epsilon)
                 return maxCol;
             if (Math.Abs(frac - 0) < Utilities.Constants.Epsilon)
                 return minCol;
 
-            double r = (maxCol.R - minCol.R) * frac + minCol.R;
-            double g = (maxCol.G - minCol.G) * frac + minCol.G;
-            double b = (maxCol.B - minCol.B) * frac + minCol.B;
-            double a = (maxCol.A - minCol.A) * frac + minCol.A;
+            var r = (maxCol.R - minCol.R) * frac + minCol.R;
+            var g = (maxCol.G - minCol.G) * frac + minCol.G;
+            var b = (maxCol.B - minCol.B) * frac + minCol.B;
+            var a = (maxCol.A - minCol.A) * frac + minCol.A;
             if (r > 255) r = 255;
             if (g > 255) g = 255;
             if (b > 255) b = 255;
@@ -255,5 +251,5 @@ namespace Mapsui.Styles.Thematics
 
             return Color.FromArgb((int)a, (int)r, (int)g, (int)b);
         }
-            }
+    }
 }

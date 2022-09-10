@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using Mapsui.Layers;
 using Mapsui.Providers;
 using Mapsui.Styles;
+using Mapsui.Tiling;
 using Mapsui.UI;
-using Mapsui.Utilities;
+
+#pragma warning disable IDISP004 // Don't ignore created IDisposable
 
 namespace Mapsui.Samples.Common.Maps
 {
-    public class RasterizingLayerSample : ISample
+    public class RasterizingLayerSample : IMapControlSample
     {
         public string Name => "Rasterizing Layer";
         public string Category => "Special";
@@ -23,27 +25,23 @@ namespace Mapsui.Samples.Common.Maps
             var map = new Map();
             map.Layers.Add(OpenStreetMap.CreateTileLayer());
             map.Layers.Add(new RasterizingLayer(CreateRandomPointLayer(), pixelDensity: pixelDensity));
-            map.Home = n => n.NavigateTo(map.Layers[1].Envelope.Grow(map.Layers[1].Envelope.Width * 0.1));
+            var extent = map.Layers[1].Extent!.Grow(map.Layers[1].Extent!.Width * 0.1);
+            map.Home = n => n.NavigateTo(extent);
             return map;
         }
 
         private static MemoryLayer CreateRandomPointLayer()
         {
             var rnd = new Random(3462); // Fix the random seed so the features don't move after a refresh
-            var features = new List<IGeometryFeature>();
+            var features = new List<IFeature>();
             for (var i = 0; i < 100; i++)
             {
-                var feature = new Feature
-                {
-                    Geometry = new Geometries.Point(rnd.Next(0, 5000000), rnd.Next(0, 5000000))
-                };
-                features.Add(feature);
+                features.Add(new PointFeature(new MPoint(rnd.Next(0, 5000000), rnd.Next(0, 5000000))));
             }
-            var provider = new MemoryProvider<IGeometryFeature>(features);
 
             return new MemoryLayer
             {
-                DataSource = provider,
+                Features = features,
                 Style = new SymbolStyle
                 {
                     SymbolType = SymbolType.Triangle,

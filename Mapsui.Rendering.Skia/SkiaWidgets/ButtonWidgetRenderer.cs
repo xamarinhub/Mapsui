@@ -1,4 +1,5 @@
-﻿using Mapsui.Widgets;
+﻿using Mapsui.Utilities;
+using Mapsui.Widgets;
 using Mapsui.Widgets.ButtonWidget;
 using SkiaSharp;
 using Svg.Skia;
@@ -14,17 +15,19 @@ namespace Mapsui.Rendering.Skia.SkiaWidgets
             if (button.Picture == null && string.IsNullOrEmpty(button.SvgImage))
                 return;
 
-            if (button.Picture == null)
-                button.Picture = new SKSvg().FromSvg(button.SvgImage);
+            button.Picture ??= button.SvgImage?.LoadSvg();
 
             var picture = button.Picture as SKPicture;
 
             if (picture == null)
                 return;
 
+            if (button.Envelope == null)
+                return;
+
             // Get the scale for picture in each direction
-            float scaleX = (float)(button.Envelope.Width / picture.CullRect.Width);
-            float scaleY = (float)(button.Envelope.Height / picture.CullRect.Height);
+            var scaleX = (float)(button.Envelope.Width / picture.CullRect.Width);
+            var scaleY = (float)(button.Envelope.Height / picture.CullRect.Height);
 
             // Rotate picture
             var matrix = SKMatrix.CreateRotationDegrees(button.Rotation, picture.CullRect.Width / 2f, picture.CullRect.Height / 2f);
@@ -35,7 +38,8 @@ namespace Mapsui.Rendering.Skia.SkiaWidgets
             // Translate picture to right place
             matrix = matrix.PostConcat(SKMatrix.CreateTranslation((float)button.Envelope.MinX, (float)button.Envelope.MinY));
 
-            canvas.DrawPicture(picture, ref matrix, new SKPaint() { IsAntialias = true });
+            using var skPaint = new SKPaint { IsAntialias = true };
+            canvas.DrawPicture(picture, ref matrix, skPaint);
         }
     }
 }

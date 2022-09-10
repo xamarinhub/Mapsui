@@ -1,21 +1,33 @@
-﻿using Mapsui.Geometries;
+﻿using Mapsui.Layers;
+using Mapsui.Rendering.Skia.Extensions;
+using Mapsui.Rendering.Skia.SkiaStyles;
 using Mapsui.Styles;
 using SkiaSharp;
 using System;
-using Mapsui.Rendering.Skia.Extensions;
 using Topten.RichTextKit;
 
 namespace Mapsui.Rendering.Skia
 {
-    public class CalloutStyleRenderer : SymbolStyle
+    public class CalloutStyleRenderer : ISkiaStyleRenderer
     {
-        public static void Draw(SKCanvas canvas, IReadOnlyViewport viewport, 
-            float opacity, Point destination, CalloutStyle calloutStyle)
+        public bool Draw(SKCanvas canvas, IReadOnlyViewport viewport, ILayer layer, IFeature feature, Styles.IStyle style, ISymbolCache symbolCache, long iteration)
         {
+            var centroid = feature.Extent?.Centroid;
+
+            if (centroid is null)
+                return false;
+
+            var calloutStyle = (CalloutStyle)style;
+
+            // Todo: Use opacity
+            var opacity = (float)(layer.Opacity * style.Opacity);
+
+            var (x, y) = viewport.WorldToScreenXY(centroid.X, centroid.Y);
+
             if (calloutStyle.BitmapId < 0 || calloutStyle.Invalidated)
             {
                 if (calloutStyle.Content < 0 && calloutStyle.Type == CalloutType.Custom)
-                    return;
+                    return false;
 
                 if (calloutStyle.Invalidated)
                 {
@@ -27,42 +39,45 @@ namespace Mapsui.Rendering.Skia
 
             // Now we have the complete callout rendered, so we could draw it
             if (calloutStyle.BitmapId < 0)
-                return;
+                return false;
 
             var picture = (SKPicture)BitmapRegistry.Instance.Get(calloutStyle.BitmapId);
 
             // Calc offset (relative or absolute)
-            var symbolOffsetX = calloutStyle.SymbolOffset.IsRelative ? picture.CullRect.Width * (float)calloutStyle.SymbolOffset.X : (float)calloutStyle.SymbolOffset.X;
-            var symbolOffsetY = calloutStyle.SymbolOffset.IsRelative ? picture.CullRect.Height * (float)calloutStyle.SymbolOffset.Y : (float)calloutStyle.SymbolOffset.Y;
+            MPoint symbolOffset = calloutStyle.SymbolOffset.ToPoint();
+            if (calloutStyle.SymbolOffset.IsRelative)
+            {
+                symbolOffset.X *= picture.CullRect.Width;
+                symbolOffset.Y *= picture.CullRect.Height;
+            }
 
             var rotation = (float)calloutStyle.SymbolRotation;
-            
-            if (viewport.Rotation != 0 && calloutStyle.RotateWithMap) 
-                rotation += (float)viewport.Rotation;
-            
-            if (viewport.Rotation != 0 && calloutStyle.SymbolOffsetRotatesWithMap)
-            { 
-                var mapRotation = viewport.Rotation / 180.0 * Math.PI;
-                var x = Math.Cos(mapRotation) * symbolOffsetX - Math.Sin(mapRotation) * symbolOffsetY;
-                var y = Math.Sin(mapRotation) * symbolOffsetX + Math.Cos(mapRotation) * symbolOffsetY;
-                symbolOffsetX = (float)x;
-                symbolOffsetY = (float)y;
+
+            if (viewport.Rotation != 0)
+            {
+                if (calloutStyle.RotateWithMap)
+                    rotation += (float)viewport.Rotation;
+                if (calloutStyle.SymbolOffsetRotatesWithMap)
+                    symbolOffset = symbolOffset.Rotate(-viewport.Rotation);
             }
 
             // Save state of the canvas, so we could move and rotate the canvas
             canvas.Save();
 
             // Move 0/0 to the Anchor point of Callout
-            canvas.Translate((float)destination.X - symbolOffsetX, (float)destination.Y - symbolOffsetY);
+            canvas.Translate((float)(x - symbolOffset.X), (float)(y - symbolOffset.Y));
             canvas.Scale((float)calloutStyle.SymbolScale, (float)calloutStyle.SymbolScale);
 
             // 0/0 are assumed at center of image, but Picture has 0/0 at left top position
             canvas.RotateDegrees(rotation);
             canvas.Translate((float)calloutStyle.Offset.X, (float)calloutStyle.Offset.Y);
 
-            canvas.DrawPicture(picture, new SKPaint() { IsAntialias = true });
+            using var skPaint = new SKPaint() { IsAntialias = true };
+            canvas.DrawPicture(picture, skPaint);
 
             canvas.Restore();
+
+            return true;
         }
 
         public static void RenderCallout(CalloutStyle callout)
@@ -78,8 +93,8 @@ namespace Mapsui.Rendering.Skia
             {
                 var bitmapInfo = BitmapHelper.LoadBitmap(BitmapRegistry.Instance.Get(callout.Content));
 
-                contentWidth = bitmapInfo.Width;
-                contentHeight = bitmapInfo.Height;
+                contentWidth = bitmapInfo?.Width ?? 0;
+                contentHeight = bitmapInfo?.Height ?? 0;
             }
             else if (callout.Type == CalloutType.Single || callout.Type == CalloutType.Detail)
             {
@@ -94,7 +109,7 @@ namespace Mapsui.Rendering.Skia
             // Create a canvas for drawing
             using (var rec = new SKPictureRecorder())
             using (var canvas = rec.BeginRecording(new SKRect(0, 0, (float)width, (float)height)))
-            { 
+            {
                 (var path, var center) = CreateCalloutPath(callout, contentWidth, contentHeight);
                 // Now move Offset to the position of the arrow
                 callout.Offset = new Offset(-center.X, -center.Y);
@@ -158,9 +173,9 @@ namespace Mapsui.Rendering.Skia
 
         private static void DrawCallout(CalloutStyle callout, SKCanvas canvas, SKPath path)
         {
-            var shadow = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.5f, Color = SKColors.Gray, MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, callout.ShadowWidth) };
-            var fill = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Fill, Color = callout.BackgroundColor.ToSkia() };
-            var stroke = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Stroke, Color = callout.Color.ToSkia(), StrokeWidth = callout.StrokeWidth };
+            using var shadow = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.5f, Color = SKColors.Gray, MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, callout.ShadowWidth) };
+            using var fill = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Fill, Color = callout.BackgroundColor.ToSkia() };
+            using var stroke = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Stroke, Color = callout.Color.ToSkia(), StrokeWidth = callout.StrokeWidth };
 
             canvas.DrawPath(path, shadow);
             canvas.DrawPath(path, fill);
@@ -240,7 +255,7 @@ namespace Mapsui.Rendering.Skia
         }
 
         private static void DrawContent(CalloutStyle callout, SKCanvas canvas)
-        { 
+        {
             // Draw content
             if (callout.Content >= 0)
             {
@@ -266,7 +281,7 @@ namespace Mapsui.Rendering.Skia
                     // Get size of content
                     var bitmapInfo = BitmapHelper.LoadBitmap(BitmapRegistry.Instance.Get(callout.Content));
 
-                    switch (bitmapInfo.Type)
+                    switch (bitmapInfo?.Type)
                     {
                         case BitmapType.Bitmap:
                             canvas.DrawImage(bitmapInfo.Bitmap, offset);
@@ -274,14 +289,20 @@ namespace Mapsui.Rendering.Skia
                         case BitmapType.Sprite:
                             throw new Exception();
                         case BitmapType.Svg:
-                            canvas.DrawPicture(bitmapInfo.Svg.Picture, offset, new SKPaint() { IsAntialias = true });
+                            if (bitmapInfo.Svg != null)
+                            {
+                                using var skPaint = new SKPaint() { IsAntialias = true };
+                                canvas.DrawPicture(bitmapInfo.Svg.Picture, offset, skPaint);
+                            }
+
                             break;
                     }
                 }
                 else if (callout.Type == CalloutType.Single || callout.Type == CalloutType.Detail)
                 {
                     var picture = (SKPicture)BitmapRegistry.Instance.Get(callout.Content);
-                    canvas.DrawPicture(picture, offset, new SKPaint() { IsAntialias = true });
+                    using var skPaint = new SKPaint() { IsAntialias = true };
+                    canvas.DrawPicture(picture, offset, skPaint);
                 }
             }
         }
@@ -388,6 +409,7 @@ namespace Mapsui.Rendering.Skia
         /// <summary>
         /// Draw arrow to path
         /// </summary>
+        /// <param name="path">The arrow path</param>
         /// <param name="start">Start of arrow at bubble</param>
         /// <param name="center">Center of arrow</param>
         /// <param name="end">End of arrow at bubble</param>
@@ -403,7 +425,7 @@ namespace Mapsui.Rendering.Skia
         /// </summary>
         /// <param name="color">Color in Mapsui format</param>
         /// <returns>Color in Skia format</returns>
-        public SKColor ToSkia(Color color)
+        public static SKColor ToSkia(Color? color)
         {
             if (color == null) return new SKColor(128, 128, 128, 0);
             return new SKColor((byte)color.R, (byte)color.G, (byte)color.B, (byte)color.A);

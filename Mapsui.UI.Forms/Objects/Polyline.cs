@@ -1,19 +1,31 @@
-﻿using Mapsui.Geometries;
-using Mapsui.Providers;
-using Mapsui.Styles;
-using Mapsui.UI.Forms.Extensions;
-using Mapsui.UI.Forms.Utils;
-using Mapsui.UI.Objects;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Mapsui.Nts;
+using Mapsui.Styles;
+using Mapsui.UI.Objects;
+using NetTopologySuite.Geometries;
+using Mapsui.Nts.Extensions;
+#if __MAUI__
+using Mapsui.UI.Maui.Extensions;
+using Mapsui.UI.Maui.Utils;
+#else
+using Mapsui.UI.Forms.Extensions;
+using Mapsui.UI.Forms.Utils;
+#endif
 
+#if __MAUI__
+namespace Mapsui.UI.Maui
+#else
 namespace Mapsui.UI.Forms
+#endif
 {
     public class Polyline : Drawable
     {
+        // Todo: Rename, Polyline indicates a MultiLineString but it is a single LineString.
+
         private readonly ObservableRangeCollection<Position> _positions = new ObservableRangeCollection<Position>();
 
         /// <summary>
@@ -42,43 +54,43 @@ namespace Mapsui.UI.Forms
         /// <summary>
         /// Positions of line
         /// </summary>
-        public IList<Position> Positions
-        {
-            get { return _positions; }
-        }
+        public IList<Position> Positions => _positions;
 
-        protected override void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        protected override void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             base.OnPropertyChanged(propertyName);
 
             switch (propertyName)
             {
                 case nameof(Positions):
-                    Feature.Geometry = new LineString(Positions.Select(p => p.ToMapsui()).ToList());
+                    if (Feature == null)
+                        CreateFeature();
+                    else
+                        Feature.Geometry = Positions.Select(p => p.ToCoordinate()).ToLineString();
                     break;
             }
         }
 
-        void OnCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
             OnPropertyChanged(nameof(Positions));
         }
 
-        private object sync = new object();
+        private readonly object _sync = new();
 
         /// <summary>
         /// Create feature
         /// </summary>
         private void CreateFeature()
         {
-            lock (sync)
+            lock (_sync)
             {
                 if (Feature == null)
                 {
                     // Create a new one
-                    Feature = new Feature
+                    Feature = new GeometryFeature
                     {
-                        Geometry = new LineString(Positions.Select(p => p.ToMapsui()).ToList()),
+                        Geometry = new LineString(Positions.Select(p => p.ToCoordinate()).ToArray()),
                         ["Label"] = Label,
                     };
                     Feature.Styles.Clear();

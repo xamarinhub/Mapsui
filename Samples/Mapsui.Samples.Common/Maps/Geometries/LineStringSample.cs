@@ -1,11 +1,17 @@
 ﻿using System.Linq;
-using Mapsui.Geometries;
+using System.Threading.Tasks;
 using Mapsui.Layers;
-using Mapsui.Projection;
+using Mapsui.Nts;
+using Mapsui.Nts.Extensions;
+using Mapsui.Projections;
 using Mapsui.Providers;
 using Mapsui.Styles;
+using Mapsui.Tiling;
 using Mapsui.UI;
-using Mapsui.Utilities;
+using NetTopologySuite.Geometries;
+using NetTopologySuite.IO;
+
+#pragma warning disable IDISP004 // Don't ignore created IDisposable
 
 namespace Mapsui.Samples.Common.Maps
 {
@@ -14,31 +20,27 @@ namespace Mapsui.Samples.Common.Maps
         public string Name => "2 LineStrings";
         public string Category => "Geometries";
 
-        public void Setup(IMapControl mapControl)
-        {
-            mapControl.Map = CreateMap();
-        }
-
-        public static Map CreateMap()
+        public Task<Map> CreateMapAsync()
         {
             var map = new Map();
             map.Layers.Add(OpenStreetMap.CreateTileLayer());
             var lineStringLayer = CreateLineStringLayer(CreateLineStringStyle());
             map.Layers.Add(lineStringLayer);
-            map.Home = n => n.NavigateTo(lineStringLayer.Envelope.Centroid, 200);
-            return map;
+            map.Home = n => n.NavigateTo(lineStringLayer.Extent!.Centroid, 200);
+            return Task.FromResult(map);
         }
 
-        public static ILayer CreateLineStringLayer(IStyle style = null)
+        public static ILayer CreateLineStringLayer(IStyle? style = null)
         {
-            var lineString = (LineString)Geometry.GeomFromText(WKTGr5);
-            lineString = new LineString(lineString.Vertices.Select(v => SphericalMercator.FromLonLat(v.Y, v.X)));
+            var lineString = (LineString)new WKTReader().Read(WKTGr5);
+            lineString = new LineString(lineString.Coordinates.Select(v => SphericalMercator.FromLonLat(v.Y, v.X).ToCoordinate()).ToArray());
 
             return new MemoryLayer
             {
-                DataSource = new MemoryProvider<IGeometryFeature>(new Feature { Geometry = lineString }),
+                Features = new[] { new GeometryFeature { Geometry = lineString } },
                 Name = "LineStringLayer",
                 Style = style
+
             };
         }
 
@@ -48,7 +50,8 @@ namespace Mapsui.Samples.Common.Maps
             {
                 Fill = null,
                 Outline = null,
-                Line = { Color = Color.FromString("YellowGreen"), Width = 4}
+#pragma warning disable CS8670 // Object or collection initializer implicitly dereferences possibly null member.
+                Line = { Color = Color.FromString("YellowGreen"), Width = 4 }
             };
         }
 

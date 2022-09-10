@@ -2,8 +2,9 @@
 using Mapsui.Providers;
 using Mapsui.Samples.Common.Helpers;
 using Mapsui.Styles;
+using Mapsui.Tiling;
 using Mapsui.UI;
-using Mapsui.Utilities;
+using System.Threading.Tasks;
 
 namespace Mapsui.Samples.Common.Maps
 {
@@ -14,38 +15,33 @@ namespace Mapsui.Samples.Common.Maps
         public string Name => "Stacked labels";
         public string Category => "Special";
 
-        public void Setup(IMapControl mapControl)
-        {
-            mapControl.Map = CreateMap();
-        }
-
-        public static Map CreateMap()
+        public Task<Map> CreateMapAsync()
         {
             var map = new Map();
             map.Layers.Add(OpenStreetMap.CreateTileLayer());
-            var provider = RandomPointHelper.CreateProviderWithRandomPoints(map.Envelope);
+            var provider = RandomPointGenerator.CreateProviderWithRandomPoints(map.Extent, 25);
             map.Layers.Add(CreateStackedLabelLayer(provider, LabelColumn));
             map.Layers.Add(CreateLayer(provider));
-            return map;
+            return Task.FromResult(map);
         }
 
-        private static ILayer CreateStackedLabelLayer(IProvider<IGeometryFeature> provider, string labelColumn)
+        private static ILayer CreateStackedLabelLayer(IProvider provider, string labelColumn)
         {
-            return new MemoryLayer
+            return new Layer
             {
                 Name = "StackedLabelLayer",
                 Style = null,
                 DataSource = new StackedLabelProvider(provider, new LabelStyle
                 {
-                    BackColor = new Brush {Color = new Color(240, 240, 240, 128)},
+                    BackColor = new Brush { Color = new Color(240, 240, 240, 128) },
                     ForeColor = new Color(50, 50, 50),
                     LabelColumn = labelColumn,
-                    Font = new Font {  FontFamily = "Cambria", Size = 14}
+                    Font = new Font { FontFamily = "Cambria", Size = 14 }
                 })
             };
         }
 
-        private static ILayer CreateLayer(IProvider<IGeometryFeature> dataSource)
+        private static ILayer CreateLayer(IProvider dataSource)
         {
             return new Layer("Point Layer")
             {

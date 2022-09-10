@@ -1,13 +1,15 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Mapsui.Extensions;
+using Mapsui.Logging;
 
 namespace Mapsui.Fetcher
 {
-    class FetchWorker
+    public class FetchWorker : IDisposable // Todo: Make internal
     {
         private readonly IFetchDispatcher _fetchDispatcher;
-        private CancellationTokenSource _fetchLoopCancellationTokenSource;
+        private CancellationTokenSource? _fetchLoopCancellationTokenSource;
         public static long RestartCounter;
 
         public FetchWorker(IFetchDispatcher fetchDispatcher)
@@ -20,31 +22,49 @@ namespace Mapsui.Fetcher
             if (_fetchLoopCancellationTokenSource == null || _fetchLoopCancellationTokenSource.IsCancellationRequested)
             {
                 Interlocked.Increment(ref RestartCounter);
+                _fetchLoopCancellationTokenSource?.Dispose();
                 _fetchLoopCancellationTokenSource = new CancellationTokenSource();
-                Task.Run(() => Fetch(_fetchLoopCancellationTokenSource));
+                Catch.TaskRun(async () => await FetchAsync(_fetchLoopCancellationTokenSource));
             }
         }
 
         public void Stop()
         {
             _fetchLoopCancellationTokenSource?.Cancel();
+            _fetchLoopCancellationTokenSource?.Dispose();
             _fetchLoopCancellationTokenSource = null;
         }
 
-        private void Fetch(CancellationTokenSource cancellationTokenSource)
+        public void Dispose()
         {
-            while (cancellationTokenSource != null && !cancellationTokenSource.Token.IsCancellationRequested)
-            {
-                Action method = null;
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
 
-                if (_fetchDispatcher.TryTake(ref method))
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _fetchLoopCancellationTokenSource?.Dispose();
+                _fetchLoopCancellationTokenSource = null;
+            }
+        }
+
+        private async Task FetchAsync(CancellationTokenSource? cancellationTokenSource)
+        {
+            try
+            {
+                while (cancellationTokenSource is { Token: { IsCancellationRequested: false } })
                 {
-                    method();
+                    if (_fetchDispatcher.TryTake(out var method))
+                        await method();
+                    else
+                        cancellationTokenSource.Cancel();
                 }
-                else
-                {
-                    cancellationTokenSource.Cancel();
-                }
+            }
+            catch (ObjectDisposedException e)
+            {
+                Logger.Log(LogLevel.Error, e.Message, e);
             }
         }
     }

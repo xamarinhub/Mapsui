@@ -3,9 +3,6 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using Mapsui.Fetcher;
-using Mapsui.Geometries;
-using Mapsui.Projection;
-using Mapsui.Providers;
 using Mapsui.Styles;
 using Mapsui.Widgets;
 
@@ -15,26 +12,21 @@ namespace Mapsui.Layers
     {
         private static int _instanceCounter;
         private bool _busy;
-        private string _crs;
         private bool _enabled;
-        private bool _exclusive;
         private string _name;
         private double _maxVisible;
         private double _minVisible;
         private double _opacity;
-        private IStyle _style;
-        private object _tag;
-        private ITransformation _transformation;
-        private BoundingBox _envelope;
-
-        public Transformer Transformer { get; } = new();
+        private IStyle? _style;
+        private object? _tag;
+        private MRect? _extent;
 
         /// <summary>
         /// Get a layer's styles
         /// </summary>
         /// <param name="layer">Layer, for which styles should be returned</param>
         /// <returns>Enumerable with styles belonging to layer</returns>
-        public static IEnumerable<IStyle> GetLayerStyles(ILayer layer)
+        public static IEnumerable<IStyle?> GetLayerStyles(ILayer? layer)
         {
             if (layer == null) return Array.Empty<IStyle>();
             var style = layer.Style as StyleCollection;
@@ -46,7 +38,7 @@ namespace Mapsui.Layers
         /// </summary>
         protected BaseLayer()
         {
-            Name = "Layer";
+            _name = "Layer";
             Style = new VectorStyle();
             Enabled = true;
             MinVisible = 0;
@@ -68,24 +60,22 @@ namespace Mapsui.Layers
         /// <summary>
         /// Called whenever a property changed
         /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
-        /// <summary>
-        /// DataChanged should be triggered by any data changes
-        /// </summary>
-        public event DataChangedEventHandler DataChanged;
+        /// <inheritdoc />
+        public event DataChangedEventHandler? DataChanged;
 
         /// <inheritdoc />
         public int Id { get; }
 
         /// <inheritdoc />
-        public object Tag 
-        { 
+        public object? Tag
+        {
             get => _tag;
             set
-            { 
-                _tag = value; 
-                OnPropertyChanged(nameof(Tag)); 
+            {
+                _tag = value;
+                OnPropertyChanged(nameof(Tag));
             }
         }
 
@@ -135,29 +125,6 @@ namespace Mapsui.Layers
         }
 
         /// <inheritdoc />
-        public string CRS
-        {
-            get => _crs;
-            set
-            {
-                _crs = value;
-                Transformer.ToCrs = CRS;
-                OnPropertyChanged(nameof(CRS));
-            }
-        }
-
-        /// <inheritdoc />
-        public bool Exclusive
-        {
-            get => _exclusive;
-            set
-            {
-                _exclusive = value;
-                OnPropertyChanged(nameof(Exclusive));
-            }
-        }
-
-        /// <inheritdoc />
         public double Opacity
         {
             get => _opacity;
@@ -181,7 +148,7 @@ namespace Mapsui.Layers
         }
 
         /// <inheritdoc />
-        public IStyle Style
+        public IStyle? Style
         {
             get => _style;
             set
@@ -191,34 +158,21 @@ namespace Mapsui.Layers
             }
         }
 
-        /// <inheritdoc />
-        public ITransformation Transformation
-        {
-            get => _transformation;
-            set
-            {
-                _transformation = value;
-                Transformer.Transformation = _transformation;
-                OnPropertyChanged(nameof(Transformation));
-            }
-        }
-
-       
         /// <summary>
         /// Returns the envelope of all available data in the layer
         /// </summary>
-        public virtual BoundingBox Envelope
+        public virtual MRect? Extent
         {
-            get => _envelope;
+            get => _extent;
             protected set
             {
-                _envelope = value;
-                OnPropertyChanged(nameof(Envelope));
+                _extent = value;
+                OnPropertyChanged(nameof(Extent));
             }
         }
 
         /// <inheritdoc />
-        public Hyperlink Attribution { get; set; }
+        public Hyperlink Attribution { get; set; } = new();
 
         /// <inheritdoc />
         public virtual IReadOnlyList<double> Resolutions { get; } = new List<double>();
@@ -227,21 +181,11 @@ namespace Mapsui.Layers
         public bool IsMapInfoLayer { get; set; }
 
         /// <inheritdoc />
-        public abstract IEnumerable<IFeature> GetFeaturesInView(BoundingBox box, double resolution);
-
-        /// <inheritdoc />
-
-        public abstract void RefreshData(BoundingBox extent, double resolution, ChangeType changeType);
+        public abstract IEnumerable<IFeature> GetFeatures(MRect box, double resolution);
 
         public void DataHasChanged()
         {
             DataChanged?.Invoke(this, new DataChangedEventArgs());
-        }
-
-        /// <inheritdoc />
-        public virtual bool? IsCrsSupported(string crs)
-        {
-            return null;
         }
 
         public override string ToString()
@@ -257,6 +201,24 @@ namespace Mapsui.Layers
         protected void OnDataChanged(DataChangedEventArgs args)
         {
             DataChanged?.Invoke(this, args);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+            }
+        }
+
+        public virtual void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        public virtual bool UpdateAnimations()
+        {
+            return false; // By default there are no animation and nothing to update
         }
     }
 }

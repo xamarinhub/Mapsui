@@ -1,6 +1,4 @@
-﻿using Mapsui.Geometries;
-
-namespace Mapsui.Styles
+﻿namespace Mapsui.Styles
 {
     public class Sprite
     {
@@ -10,7 +8,7 @@ namespace Mapsui.Styles
         public int Width { get; }
         public int Height { get; }
         public float PixelRatio { get; }
-        public object Data { get; set; }
+        public object? Data { get; set; }
 
         public Sprite(int atlas, int x, int y, int width, int height, float pixelRatio)
         {
@@ -22,7 +20,7 @@ namespace Mapsui.Styles
             PixelRatio = pixelRatio;
         }
 
-        public Sprite(int atlas, Point p, Size s, float pixelRatio) : this(atlas, (int)p.X, (int)p.Y, (int)s.Width, (int)s.Height, pixelRatio)
+        public Sprite(int atlas, MPoint p, Size s, float pixelRatio) : this(atlas, (int)p.X, (int)p.Y, (int)s.Width, (int)s.Height, pixelRatio)
         {
         }
 

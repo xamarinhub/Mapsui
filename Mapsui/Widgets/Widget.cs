@@ -1,5 +1,4 @@
-﻿using Mapsui.Geometries;
-using System;
+﻿using System;
 
 namespace Mapsui.Widgets
 {
@@ -9,7 +8,7 @@ namespace Mapsui.Widgets
         public VerticalAlignment VerticalAlignment { get; set; } = VerticalAlignment.Bottom;
         public float MarginX { get; set; } = 2;
         public float MarginY { get; set; } = 2;
-        public BoundingBox Envelope { get; set; }
+        public MRect? Envelope { get; set; }
         public bool Enabled { get; set; } = true;
 
         public float CalculatePositionX(float left, float right, float width)
@@ -46,6 +45,6 @@ namespace Mapsui.Widgets
             throw new ArgumentException("Unknown vertical alignment: " + VerticalAlignment);
         }
 
-        public abstract bool HandleWidgetTouched(INavigator navigator, Point position);
+        public abstract bool HandleWidgetTouched(INavigator navigator, MPoint position);
     }
 }

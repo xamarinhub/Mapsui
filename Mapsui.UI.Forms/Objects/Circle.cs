@@ -1,25 +1,47 @@
-﻿using Mapsui.UI.Objects;
-using Mapsui.Styles;
-using Mapsui.Providers;
-using Mapsui.UI.Forms.Extensions;
-using System.Runtime.CompilerServices;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
-using Xamarin.Forms;
-using System;
+using System.Runtime.CompilerServices;
+using Mapsui.Nts;
+using Mapsui.Styles;
+using Mapsui.UI.Objects;
+using NetTopologySuite.Geometries;
 
+#if __MAUI__
+using Mapsui.UI.Maui.Extensions;
+using Microsoft.Maui;
+using Microsoft.Maui.Controls;
+using Mapsui.UI.Maui;
+
+using Color = Microsoft.Maui.Graphics.Color;
+using KnownColor = Mapsui.UI.Maui.KnownColor;
+#else
+using Xamarin.Forms;
+using Mapsui.UI.Forms.Extensions;
+
+using Color = Xamarin.Forms.Color;
+using KnownColor = Xamarin.Forms.Color;
+#endif
+
+#if __MAUI__
+namespace Mapsui.UI.Maui
+#else
 namespace Mapsui.UI.Forms
+#endif
 {
     public class Circle : Drawable
     {
         public static readonly BindableProperty CenterProperty = BindableProperty.Create(nameof(Center), typeof(Position), typeof(Circle), default(Position));
         public static readonly BindableProperty RadiusProperty = BindableProperty.Create(nameof(Radius), typeof(Distance), typeof(Circle), Distance.FromMeters(1));
         public static readonly BindableProperty QualityProperty = BindableProperty.Create(nameof(Quality), typeof(double), typeof(Circle), 3.0);
-        public static readonly BindableProperty FillColorProperty = BindableProperty.Create(nameof(FillColor), typeof(Xamarin.Forms.Color), typeof(Circle), Xamarin.Forms.Color.DarkGray);
+        public static readonly BindableProperty FillColorProperty = BindableProperty.Create(nameof(FillColor), typeof(Color), typeof(Circle), KnownColor.DarkGray);
 
         public Circle()
         {
             CreateFeature();
         }
+
+        private readonly object _sync = new();
 
         /// <summary>
         /// Center of circle
@@ -42,9 +64,9 @@ namespace Mapsui.UI.Forms
         /// <summary>
         /// Color to fill circle with
         /// </summary>
-        public Xamarin.Forms.Color FillColor
+        public Color FillColor
         {
-            get => (Xamarin.Forms.Color)GetValue(FillColorProperty);
+            get => (Color)GetValue(FillColorProperty);
             set => SetValue(FillColorProperty, value);
         }
 
@@ -57,7 +79,7 @@ namespace Mapsui.UI.Forms
             set => SetValue(QualityProperty, value);
         }
 
-        protected override void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        protected override void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             base.OnPropertyChanged(propertyName);
 
@@ -73,18 +95,29 @@ namespace Mapsui.UI.Forms
                     UpdateFeature();
                     break;
                 case nameof(FillColor):
-                    ((VectorStyle)Feature.Styles.First()).Fill = new Styles.Brush(FillColor.ToMapsui());
+                    if (Feature != null)
+                        ((VectorStyle)Feature.Styles.First()).Fill = new Styles.Brush(FillColor.ToMapsui());
                     break;
                 case nameof(StrokeWidth):
-                    ((VectorStyle)Feature.Styles.First()).Outline.Width = StrokeWidth;
+                    if (Feature != null)
+                    {
+                        var outline = ((VectorStyle)Feature.Styles.First()).Outline;
+                        if (outline != null)
+                            outline.Width = StrokeWidth;
+                    }
+
                     break;
                 case nameof(StrokeColor):
-                    ((VectorStyle)Feature.Styles.First()).Outline.Color = StrokeColor.ToMapsui();
+                    if (Feature != null)
+                    {
+                        var outline = ((VectorStyle)Feature.Styles.First()).Outline;
+                        if (outline != null)
+                            outline.Color = StrokeColor.ToMapsui();
+                    }
+
                     break;
             }
         }
-
-        private readonly object _sync = new object();
 
         private void CreateFeature()
         {
@@ -93,10 +126,9 @@ namespace Mapsui.UI.Forms
                 if (Feature == null)
                 {
                     // Create a new one
-                    Feature = new Feature
+                    Feature = new GeometryFeature
                     {
-                        Geometry = new Geometries.Polygon(),
-                        ["Label"] = Label,
+                        ["Label"] = Label
                     };
                     Feature.Styles.Clear();
                     Feature.Styles.Add(new VectorStyle
@@ -121,15 +153,17 @@ namespace Mapsui.UI.Forms
             var centerY = Center.ToMapsui().Y;
             var radius = Radius.Meters / Math.Cos(Center.Latitude / 180.0 * Math.PI);
             var increment = 360.0 / (Quality < 3.0 ? 3.0 : (Quality > 360.0 ? 360.0 : Quality));
-            var exteriorRing = new Geometries.LinearRing();
+            var exteriorRing = new List<Coordinate>();
 
             for (double angle = 0; angle < 360; angle += increment)
             {
                 var angleRad = angle / 180.0 * Math.PI;
-                exteriorRing.Vertices.Add(new Geometries.Point(radius * Math.Sin(angleRad) + centerX, radius * Math.Cos(angleRad) + centerY));
+                exteriorRing.Add(new Coordinate(radius * Math.Sin(angleRad) + centerX, radius * Math.Cos(angleRad) + centerY));
             }
 
-            Feature.Geometry = new Geometries.Polygon(exteriorRing);
+            exteriorRing.Add(exteriorRing[0].Copy());
+
+            Feature!.Geometry = new NetTopologySuite.Geometries.Polygon(new LinearRing(exteriorRing.ToArray()));
         }
     }
 }

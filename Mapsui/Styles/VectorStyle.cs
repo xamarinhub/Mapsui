@@ -12,19 +12,19 @@ namespace Mapsui.Styles
         /// <summary>
         /// Line style for line geometries
         /// </summary>
-        public Pen Line { get; set; }
+        public Pen? Line { get; set; }
 
         /// <summary>
         /// Outline style for line and polygon geometries
         /// </summary>
-        public Pen Outline { get; set; }
+        public Pen? Outline { get; set; }
 
         /// <summary>
         /// Fill style for Polygon geometries
         /// </summary>
-        public Brush Fill { get; set; }
-        
-        public override bool Equals(object obj)
+        public Brush? Fill { get; set; }
+
+        public override bool Equals(object? obj)
         {
             if (!(obj is VectorStyle style))
             {
@@ -33,60 +33,40 @@ namespace Mapsui.Styles
             return Equals(style);
         }
 
-        public bool Equals(VectorStyle vectorStyle)
+        public bool Equals(VectorStyle? vectorStyle)
         {
+            if (vectorStyle == null)
+                return false;
+
             if (!base.Equals(vectorStyle))
-            {
                 return false;
-            }
 
-            if ((Line == null) ^ (vectorStyle.Line == null))
-            {
+            if (!Line?.Equals(vectorStyle.Line) ?? false)
                 return false;
-            }
 
-            if (Line != null && !Line.Equals(vectorStyle.Line))
-            {
+            if (!Outline?.Equals(vectorStyle.Outline) ?? false)
                 return false;
-            }
 
-            if ((Outline == null) ^ (vectorStyle.Outline == null))
-            {
+            if (!Fill?.Equals(vectorStyle.Fill) ?? false)
                 return false;
-            }
-
-            if (Outline != null && !Outline.Equals(vectorStyle.Outline))
-            {
-                return false;
-            }
-
-            if ((Fill == null) ^ (vectorStyle.Fill == null))
-            {
-                return false;
-            }
-
-            if (Fill != null && !Fill.Equals(vectorStyle.Fill))
-            {
-                return false;
-            }
 
             return true;
         }
 
         public override int GetHashCode()
         {
-            return (Line == null ? 0 : Line.GetHashCode())
-                ^ (Outline == null ? 0 :  Outline.GetHashCode()) 
-                ^ (Fill ==  null ? 0 : Fill.GetHashCode())
+            return Line?.GetHashCode() ?? 0
+                ^ Outline?.GetHashCode() ?? 0
+                ^ Fill?.GetHashCode() ?? 0
                 ^ base.GetHashCode();
         }
 
-        public static bool operator ==(VectorStyle vectorStyle1, VectorStyle vectorStyle2)
+        public static bool operator ==(VectorStyle? vectorStyle1, VectorStyle? vectorStyle2)
         {
             return Equals(vectorStyle1, vectorStyle2);
         }
 
-        public static bool operator !=(VectorStyle vectorStyle1, VectorStyle vectorStyle2)
+        public static bool operator !=(VectorStyle? vectorStyle1, VectorStyle? vectorStyle2)
         {
             return !Equals(vectorStyle1, vectorStyle2);
         }

@@ -1,16 +1,15 @@
-﻿using Mapsui.Geometries;
-using System;
+﻿using System;
 
 namespace Mapsui.Widgets
 {
     public class WidgetTouchedEventArgs : EventArgs
     {
-        public WidgetTouchedEventArgs(Point position)
+        public WidgetTouchedEventArgs(MPoint position)
         {
             Position = position;
         }
 
-        public Point Position { get; }
+        public MPoint Position { get; }
 
         /// <summary>
         /// True, if this Widget had handled this event

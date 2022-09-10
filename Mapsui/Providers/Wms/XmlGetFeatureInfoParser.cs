@@ -9,7 +9,7 @@ namespace Mapsui.Providers.Wms
 {
     public class XmlGetFeatureInfoParser : IGetFeatureInfoParser
     {
-        public FeatureInfo ParseWMSResult(string layerName, Stream result)
+        public FeatureInfo ParseWMSResult(string? layerName, Stream result)
         {
             var featureInfos = new List<Dictionary<string, string>>();
             XDocument xdoc;
@@ -22,7 +22,7 @@ namespace Mapsui.Providers.Wms
             {
                 throw new ArgumentException(e.Message);
             }
-            
+
             var fields = (from XElement element in xdoc.Descendants()
                           where (element.Name.LocalName.Equals("FIELDS"))
                           select element);
@@ -56,12 +56,12 @@ namespace Mapsui.Providers.Wms
                 }
             }
 
-            if(featureMember.HasAttributes)
+            if (featureMember.HasAttributes)
             {
                 foreach (var attribute in featureMember.Attributes())
                 {
-                     featureInfo.Add(attribute.Name.ToString(), attribute.Value);
-                }                
+                    featureInfo.Add(attribute.Name.ToString(), attribute.Value);
+                }
             }
 
             return featureInfo;

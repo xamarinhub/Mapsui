@@ -1,11 +1,24 @@
-﻿using Mapsui.Providers;
-using Mapsui.Styles;
-using Mapsui.UI.Forms;
-using Mapsui.UI.Forms.Extensions;
-using System;
+﻿using System;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Mapsui.Nts;
+using Mapsui.Styles;
+#if __MAUI__
+using Mapsui.UI.Maui;
+using Mapsui.UI.Maui.Extensions;
+using Microsoft.Maui;
+using Microsoft.Maui.Controls;
+
+using Color = Microsoft.Maui.Graphics.Color;
+using KnownColor = Mapsui.UI.Maui.KnownColor;
+#else
+using Mapsui.UI.Forms;
+using Mapsui.UI.Forms.Extensions;
 using Xamarin.Forms;
+
+using Color = Xamarin.Forms.Color;
+using KnownColor = Xamarin.Forms.Color;
+#endif
 
 namespace Mapsui.UI.Objects
 {
@@ -16,19 +29,19 @@ namespace Mapsui.UI.Objects
     {
         public static readonly BindableProperty LabelProperty = BindableProperty.Create(nameof(Label), typeof(string), typeof(Pin), default(string));
         public static readonly BindableProperty StrokeWidthProperty = BindableProperty.Create(nameof(StrokeWidth), typeof(float), typeof(Circle), 1f);
-        public static readonly BindableProperty StrokeColorProperty = BindableProperty.Create(nameof(StrokeColor), typeof(Xamarin.Forms.Color), typeof(Circle), Xamarin.Forms.Color.Black);
         public static readonly BindableProperty MinVisibleProperty = BindableProperty.Create(nameof(MinVisible), typeof(double), typeof(Circle), 0.0);
         public static readonly BindableProperty MaxVisibleProperty = BindableProperty.Create(nameof(MaxVisible), typeof(double), typeof(Circle), double.MaxValue);
         public static readonly BindableProperty ZIndexProperty = BindableProperty.Create(nameof(ZIndex), typeof(int), typeof(Circle), 0);
         public static readonly BindableProperty IsClickableProperty = BindableProperty.Create(nameof(IsClickable), typeof(bool), typeof(Drawable), false);
+        public static readonly BindableProperty StrokeColorProperty = BindableProperty.Create(nameof(StrokeColor), typeof(Color), typeof(Circle), KnownColor.Black);
 
         /// <summary>
         /// Label of drawable
         /// </summary>
         public string Label
         {
-            get { return (string)GetValue(LabelProperty); }
-            set { SetValue(LabelProperty, value); }
+            get => (string)GetValue(LabelProperty);
+            set => SetValue(LabelProperty, value);
         }
 
         /// <summary>
@@ -36,16 +49,16 @@ namespace Mapsui.UI.Objects
         /// </summary>
         public float StrokeWidth
         {
-            get { return (float)GetValue(StrokeWidthProperty); }
-            set { SetValue(StrokeWidthProperty, value); }
+            get => (float)GetValue(StrokeWidthProperty);
+            set => SetValue(StrokeWidthProperty, value);
         }
 
         /// <summary>
         /// StrokeColor for drawable
         /// </summary>
-        public Xamarin.Forms.Color StrokeColor
+        public Color StrokeColor
         {
-            get { return (Xamarin.Forms.Color)GetValue(StrokeColorProperty); }
+            get { return (Color)GetValue(StrokeColorProperty); }
             set { SetValue(StrokeColorProperty, value); }
         }
 
@@ -54,8 +67,8 @@ namespace Mapsui.UI.Objects
         /// </summary>
         public double MinVisible
         {
-            get { return (double)GetValue(MinVisibleProperty); }
-            set { SetValue(MinVisibleProperty, value); }
+            get => (double)GetValue(MinVisibleProperty);
+            set => SetValue(MinVisibleProperty, value);
         }
 
         /// <summary>
@@ -63,8 +76,8 @@ namespace Mapsui.UI.Objects
         /// </summary>
         public double MaxVisible
         {
-            get { return (double)GetValue(MaxVisibleProperty); }
-            set { SetValue(MaxVisibleProperty, value); }
+            get => (double)GetValue(MaxVisibleProperty);
+            set => SetValue(MaxVisibleProperty, value);
         }
 
         /// <summary>
@@ -72,8 +85,8 @@ namespace Mapsui.UI.Objects
         /// </summary>
         public int ZIndex
         {
-            get { return (int)GetValue(ZIndexProperty); }
-            set { SetValue(ZIndexProperty, value); }
+            get => (int)GetValue(ZIndexProperty);
+            set => SetValue(ZIndexProperty, value);
         }
 
         /// <summary>
@@ -81,26 +94,23 @@ namespace Mapsui.UI.Objects
         /// </summary>
         public bool IsClickable
         {
-            get { return (bool)GetValue(IsClickableProperty); }
-            set { SetValue(IsClickableProperty, value); }
+            get => (bool)GetValue(IsClickableProperty);
+            set => SetValue(IsClickableProperty, value);
         }
 
         /// <summary>
         /// Object for free use
         /// </summary>
-        public object Tag { get; set; }
+        public object? Tag { get; set; }
 
-        private IGeometryFeature feature;
+        private GeometryFeature? feature;
 
         /// <summary>
         /// Mapsui Feature belonging to this drawable
         /// </summary>
-        public IGeometryFeature Feature
+        public GeometryFeature? Feature
         {
-            get
-            {
-                return feature;
-            }
+            get => feature;
             set
             {
                 if (feature == null || !feature.Equals(value))
@@ -111,7 +121,7 @@ namespace Mapsui.UI.Objects
         /// <summary>
         /// Event called, if this drawable is clicked an IsClickable is true
         /// </summary>
-        public event EventHandler<DrawableClickedEventArgs> Clicked;
+        public event EventHandler<DrawableClickedEventArgs>? Clicked;
 
         void IClickable.HandleClicked(DrawableClickedEventArgs e)
         {
@@ -122,23 +132,27 @@ namespace Mapsui.UI.Objects
             Clicked?.Invoke(this, e);
         }
 
-        protected override void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        protected override void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             base.OnPropertyChanged(propertyName);
+
+            var vectorStyle = ((VectorStyle?)Feature?.Styles.FirstOrDefault());
+            if (vectorStyle == null || vectorStyle.Line == null)
+                return;
 
             switch (propertyName)
             {
                 case nameof(StrokeWidth):
-                    ((VectorStyle)Feature.Styles.First()).Line.Width = StrokeWidth;
+                    vectorStyle.Line.Width = StrokeWidth;
                     break;
                 case nameof(StrokeColor):
-                    ((VectorStyle)Feature.Styles.First()).Line.Color = StrokeColor.ToMapsui();
+                    vectorStyle.Line.Color = StrokeColor.ToMapsui();
                     break;
                 case nameof(MinVisible):
-                    ((VectorStyle)Feature.Styles.First()).MinVisible = MinVisible;
+                    vectorStyle.MinVisible = MinVisible;
                     break;
                 case nameof(MaxVisible):
-                    ((VectorStyle)Feature.Styles.First()).MaxVisible = MaxVisible;
+                    vectorStyle.MaxVisible = MaxVisible;
                     break;
             }
         }

@@ -1,30 +1,45 @@
-﻿using Mapsui.Providers;
-using Mapsui.Rendering.Skia;
-using Mapsui.Styles;
-using Mapsui.UI.Objects;
-using SkiaSharp;
-using SkiaSharp.Views.Forms;
-using Svg.Skia;
+﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Mapsui.Nts;
+using Mapsui.Styles;
+using Mapsui.UI.Objects;
+using Mapsui.Utilities;
+using SkiaSharp;
+#if __MAUI__
+using Microsoft.Maui;
+using Microsoft.Maui.Graphics;
+using Microsoft.Maui.Controls;
+using SkiaSharp.Views.Maui;
+
+using Color = Microsoft.Maui.Graphics.Color;
+using KnownColor = Mapsui.UI.Maui.KnownColor;
+#else
+using SkiaSharp.Views.Forms;
 using Xamarin.Forms;
 
+using Color = Xamarin.Forms.Color;
+using KnownColor = Xamarin.Forms.Color;
+#endif
+
+#if __MAUI__
+namespace Mapsui.UI.Maui
+#else
 namespace Mapsui.UI.Forms
+#endif
 {
-    public class Pin : BindableObject, IFeatureProvider
+    public class Pin : BindableObject, IFeatureProvider, IDisposable
     {
         // Cache for used bitmaps
-        private static Dictionary<string, int> _bitmapIds = new Dictionary<string, int>();
+        private static readonly Dictionary<string, int> _bitmapIds = new Dictionary<string, int>();
 
         private string _bitmapIdKey = string.Empty; // Key for active _bitmapIds entry
         private int _bitmapId = -1;
-        private byte[] _bitmapData;
-        private MapView _mapView;
+        private byte[]? _bitmapData;
+        private MapView? _mapView;
 
         public static readonly BindableProperty TypeProperty = BindableProperty.Create(nameof(Type), typeof(PinType), typeof(Pin), default(PinType));
-        public static readonly BindableProperty ColorProperty = BindableProperty.Create(nameof(Color), typeof(Xamarin.Forms.Color), typeof(Pin), SKColors.Red.ToFormsColor());
         public static readonly BindableProperty PositionProperty = BindableProperty.Create(nameof(Position), typeof(Position), typeof(Pin), default(Position));
         public static readonly BindableProperty LabelProperty = BindableProperty.Create(nameof(Label), typeof(string), typeof(Pin), default(string));
         public static readonly BindableProperty AddressProperty = BindableProperty.Create(nameof(Address), typeof(string), typeof(Pin), default(string));
@@ -40,6 +55,7 @@ namespace Mapsui.UI.Forms
         public static readonly BindableProperty HeightProperty = BindableProperty.Create(nameof(Height), typeof(double), typeof(Pin), -1.0);
         public static readonly BindableProperty AnchorProperty = BindableProperty.Create(nameof(Anchor), typeof(Point), typeof(Pin), new Point(0, 28));
         public static readonly BindableProperty TransparencyProperty = BindableProperty.Create(nameof(Transparency), typeof(float), typeof(Pin), 0f);
+        public static readonly BindableProperty ColorProperty = BindableProperty.Create(nameof(Color), typeof(Color), typeof(Pin), KnownColor.Red);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="T:Mapsui.UI.Forms.Pin"/> class
@@ -62,12 +78,9 @@ namespace Mapsui.UI.Forms
         /// <summary>
         /// Internal MapView for refreshing of screen
         /// </summary>
-        internal MapView MapView
-        { 
-            get 
-            { 
-                return _mapView; 
-            } 
+        internal MapView? MapView
+        {
+            get => _mapView;
             set
             {
                 if (_mapView != value)
@@ -76,7 +89,8 @@ namespace Mapsui.UI.Forms
                     {
                         _mapView?.RemoveCallout(_callout);
                     }
-                    
+
+                    Feature?.Dispose();
                     Feature = null;
                     _mapView = value;
 
@@ -90,8 +104,8 @@ namespace Mapsui.UI.Forms
         /// </summary>
         public PinType Type
         {
-            get { return (PinType)GetValue(TypeProperty); }
-            set { SetValue(TypeProperty, value); }
+            get => (PinType)GetValue(TypeProperty);
+            set => SetValue(TypeProperty, value);
         }
 
         /// <summary>
@@ -99,8 +113,8 @@ namespace Mapsui.UI.Forms
         /// </summary>
         public Position Position
         {
-            get { return (Position)GetValue(PositionProperty); }
-            set { SetValue(PositionProperty, value); }
+            get => (Position)GetValue(PositionProperty);
+            set => SetValue(PositionProperty, value);
         }
 
         /// <summary>
@@ -108,16 +122,16 @@ namespace Mapsui.UI.Forms
         /// </summary>
         public float Scale
         {
-            get { return (float)GetValue(ScaleProperty); }
-            set { SetValue(ScaleProperty, value); }
+            get => (float)GetValue(ScaleProperty);
+            set => SetValue(ScaleProperty, value);
         }
 
         /// <summary>
         /// Color of pin
         /// </summary>
-        public Xamarin.Forms.Color Color
+        public Color Color
         {
-            get { return (Xamarin.Forms.Color)GetValue(ColorProperty); }
+            get { return (Color)GetValue(ColorProperty); }
             set { SetValue(ColorProperty, value); }
         }
 
@@ -126,8 +140,8 @@ namespace Mapsui.UI.Forms
         /// </summary>
         public string Label
         {
-            get { return (string)GetValue(LabelProperty); }
-            set { SetValue(LabelProperty, value); }
+            get => (string)GetValue(LabelProperty);
+            set => SetValue(LabelProperty, value);
         }
 
         /// <summary>
@@ -135,8 +149,8 @@ namespace Mapsui.UI.Forms
         /// </summary>
         public string Address
         {
-            get { return (string)GetValue(AddressProperty); }
-            set { SetValue(AddressProperty, value); }
+            get => (string)GetValue(AddressProperty);
+            set => SetValue(AddressProperty, value);
         }
 
         /// <summary>
@@ -144,8 +158,8 @@ namespace Mapsui.UI.Forms
         /// </summary>
         public byte[] Icon
         {
-            get { return (byte[])GetValue(IconProperty); }
-            set { SetValue(IconProperty, value); }
+            get => (byte[])GetValue(IconProperty);
+            set => SetValue(IconProperty, value);
         }
 
         /// <summary>
@@ -153,8 +167,8 @@ namespace Mapsui.UI.Forms
         /// </summary>
         public string Svg
         {
-            get { return (string)GetValue(SvgProperty); }
-            set { SetValue(SvgProperty, value); }
+            get => (string)GetValue(SvgProperty);
+            set => SetValue(SvgProperty, value);
         }
 
         /// <summary>
@@ -162,8 +176,8 @@ namespace Mapsui.UI.Forms
         /// </summary>
         public float Rotation
         {
-            get { return (float)GetValue(RotationProperty); }
-            set { SetValue(RotationProperty, value); }
+            get => (float)GetValue(RotationProperty);
+            set => SetValue(RotationProperty, value);
         }
 
         /// <summary>
@@ -172,8 +186,8 @@ namespace Mapsui.UI.Forms
         /// </summary>
         public bool RotateWithMap
         {
-            get { return (bool)GetValue(RotateWithMapProperty); }
-            set { SetValue(RotateWithMapProperty, value); }
+            get => (bool)GetValue(RotateWithMapProperty);
+            set => SetValue(RotateWithMapProperty, value);
         }
 
         /// <summary>
@@ -181,8 +195,8 @@ namespace Mapsui.UI.Forms
         /// </summary>
         public bool IsVisible
         {
-            get { return (bool)GetValue(IsVisibleProperty); }
-            set { SetValue(IsVisibleProperty, value); }
+            get => (bool)GetValue(IsVisibleProperty);
+            set => SetValue(IsVisibleProperty, value);
         }
 
         /// <summary>
@@ -190,8 +204,8 @@ namespace Mapsui.UI.Forms
         /// </summary>
         public double MinVisible
         {
-            get { return (double)GetValue(MinVisibleProperty); }
-            set { SetValue(MinVisibleProperty, value); }
+            get => (double)GetValue(MinVisibleProperty);
+            set => SetValue(MinVisibleProperty, value);
         }
 
         /// <summary>
@@ -199,8 +213,8 @@ namespace Mapsui.UI.Forms
         /// </summary>
         public double MaxVisible
         {
-            get { return (double)GetValue(MaxVisibleProperty); }
-            set { SetValue(MaxVisibleProperty, value); }
+            get => (double)GetValue(MaxVisibleProperty);
+            set => SetValue(MaxVisibleProperty, value);
         }
 
         /// <summary>
@@ -208,8 +222,8 @@ namespace Mapsui.UI.Forms
         /// </summary>
         public double Width
         {
-            get { return (double)GetValue(WidthProperty); }
-            private set { SetValue(WidthProperty, value); }
+            get => (double)GetValue(WidthProperty);
+            private set => SetValue(WidthProperty, value);
         }
 
         /// <summary>
@@ -217,8 +231,8 @@ namespace Mapsui.UI.Forms
         /// </summary>
         public double Height
         {
-            get { return (double)GetValue(HeightProperty); }
-            private set { SetValue(HeightProperty, value); }
+            get => (double)GetValue(HeightProperty);
+            private set => SetValue(HeightProperty, value);
         }
 
         /// <summary>
@@ -226,8 +240,8 @@ namespace Mapsui.UI.Forms
         /// </summary>
         public Point Anchor
         {
-            get { return (Point)GetValue(AnchorProperty); }
-            set { SetValue(AnchorProperty, value); }
+            get => (Point)GetValue(AnchorProperty);
+            set => SetValue(AnchorProperty, value);
         }
 
         /// <summary>
@@ -235,22 +249,22 @@ namespace Mapsui.UI.Forms
         /// </summary>
         public float Transparency
         {
-            get { return (float)GetValue(TransparencyProperty); }
-            set { SetValue(TransparencyProperty, value); }
+            get => (float)GetValue(TransparencyProperty);
+            set => SetValue(TransparencyProperty, value);
         }
 
         /// <summary>
         /// Tag holding free data
         /// </summary>
-        public object Tag { get; set; }
+        public object? Tag { get; set; }
 
         /// <summary>
         /// Mapsui feature for this pin
         /// </summary>
         /// <value>Mapsui feature</value>
-        public IGeometryFeature Feature { get; private set; }
+        public GeometryFeature? Feature { get; private set; }
 
-        private Callout _callout;
+        private Callout? _callout;
 
         /// <summary>
         /// Gets the callout
@@ -277,7 +291,7 @@ namespace Mapsui.UI.Forms
                         _callout.Subtitle = Address;
                     }
                 }
-                
+
                 return _callout;
             }
             internal set
@@ -292,8 +306,11 @@ namespace Mapsui.UI.Forms
         /// </summary>
         public void ShowCallout()
         {
-            _callout.Update();
-            _mapView.AddCallout(_callout);
+            if (_callout != null)
+            {
+                _callout.Update();
+                _mapView?.AddCallout(_callout);
+            }
         }
 
         /// <summary>
@@ -301,7 +318,7 @@ namespace Mapsui.UI.Forms
         /// </summary>
         public void HideCallout()
         {
-            _mapView.RemoveCallout(_callout);
+            _mapView?.RemoveCallout(_callout);
         }
 
         /// <summary>
@@ -310,7 +327,7 @@ namespace Mapsui.UI.Forms
         /// <returns>True, if callout is visible on map</returns>
         public bool IsCalloutVisible()
         {
-            return _mapView != null ? _mapView.IsCalloutVisible(_callout) : false;
+            return _mapView != null && _callout != null && _mapView.IsCalloutVisible(_callout);
         }
 
         /// <summary>
@@ -319,7 +336,7 @@ namespace Mapsui.UI.Forms
         /// <param name="obj">The <see cref="object"/> to compare with the current <see cref="T:Mapsui.UI.Forms.Pin"/>.</param>
         /// <returns><c>true</c> if the specified <see cref="object"/> is equal to the current
         /// <see cref="T:Mapsui.UI.Forms.Pin"/>; otherwise, <c>false</c>.</returns>
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if (ReferenceEquals(null, obj))
                 return false;
@@ -334,7 +351,7 @@ namespace Mapsui.UI.Forms
         {
             unchecked
             {
-                int hashCode = Label?.GetHashCode() ?? 0;
+                var hashCode = Label?.GetHashCode() ?? 0;
                 hashCode = (hashCode * 397) ^ Position.GetHashCode();
                 hashCode = (hashCode * 397) ^ (int)Type;
                 hashCode = (hashCode * 397) ^ (Address?.GetHashCode() ?? 0);
@@ -342,22 +359,25 @@ namespace Mapsui.UI.Forms
             }
         }
 
-        public static bool operator ==(Pin left, Pin right)
+        public static bool operator ==(Pin? left, Pin? right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(Pin left, Pin right)
+        public static bool operator !=(Pin? left, Pin? right)
         {
             return !Equals(left, right);
         }
 
-        bool Equals(Pin other)
+        private bool Equals(Pin? other)
         {
+            if (other == null)
+                return false;
+
             return string.Equals(Label, other.Label) && Equals(Position, other.Position) && Type == other.Type && string.Equals(Address, other.Address);
         }
 
-        protected override void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        protected override void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
             base.OnPropertyChanged(propertyName);
 
@@ -366,8 +386,9 @@ namespace Mapsui.UI.Forms
                 case nameof(Position):
                     if (Feature != null)
                     {
-                        Feature.Geometry = Position.ToMapsui();
-                        _callout.Feature.Geometry = Feature.Geometry;
+                        Feature.Geometry = Position.ToPoint();
+                        if (_callout != null)
+                            _callout.Feature.Geometry = Feature.Geometry;
                     }
                     break;
                 case nameof(Label):
@@ -379,32 +400,40 @@ namespace Mapsui.UI.Forms
                     Callout.Subtitle = Address;
                     break;
                 case nameof(Transparency):
-                    ((SymbolStyle)Feature.Styles.First()).Opacity = 1 - Transparency;
+                    if (Feature != null)
+                        ((SymbolStyle)Feature.Styles.First()).Opacity = 1 - Transparency;
                     break;
                 case nameof(Anchor):
-                    ((SymbolStyle)Feature.Styles.First()).SymbolOffset = new Offset(Anchor.X, Anchor.Y);
+                    if (Feature != null)
+                        ((SymbolStyle)Feature.Styles.First()).SymbolOffset = new Offset(Anchor.X, Anchor.Y);
                     break;
                 case nameof(Rotation):
-                    ((SymbolStyle)Feature.Styles.First()).SymbolRotation = Rotation;
+                    if (Feature != null)
+                        ((SymbolStyle)Feature.Styles.First()).SymbolRotation = Rotation;
                     break;
                 case nameof(RotateWithMap):
-                    ((SymbolStyle)Feature.Styles.First()).RotateWithMap = RotateWithMap;
+                    if (Feature != null)
+                        ((SymbolStyle)Feature.Styles.First()).RotateWithMap = RotateWithMap;
                     break;
                 case nameof(IsVisible):
                     if (!IsVisible)
                         HideCallout();
-                    ((SymbolStyle)Feature.Styles.First()).Enabled = IsVisible;
+                    if (Feature != null)
+                        ((SymbolStyle)Feature.Styles.First()).Enabled = IsVisible;
                     break;
                 case nameof(MinVisible):
                     // TODO: Update callout MinVisble too
-                    ((SymbolStyle)Feature.Styles.First()).MinVisible = MinVisible;
+                    if (Feature != null)
+                        ((SymbolStyle)Feature.Styles.First()).MinVisible = MinVisible;
                     break;
                 case nameof(MaxVisible):
                     // TODO: Update callout MaxVisble too
-                    ((SymbolStyle)Feature.Styles.First()).MaxVisible = MaxVisible;
+                    if (Feature != null)
+                        ((SymbolStyle)Feature.Styles.First()).MaxVisible = MaxVisible;
                     break;
                 case nameof(Scale):
-                    ((SymbolStyle)Feature.Styles.First()).SymbolScale = Scale;
+                    if (Feature != null)
+                        ((SymbolStyle)Feature.Styles.First()).SymbolScale = Scale;
                     break;
                 case nameof(Type):
                 case nameof(Color):
@@ -430,13 +459,13 @@ namespace Mapsui.UI.Forms
                 if (Feature == null)
                 {
                     // Create a new one
-                    Feature = new Feature
+                    Feature = new GeometryFeature
                     {
-                        Geometry = Position.ToMapsui(),
+                        Geometry = Position.ToPoint(),
                         ["Label"] = Label,
                     };
                     if (_callout != null)
-                        _callout.Feature.Geometry = Position.ToMapsui();
+                        _callout.Feature.Geometry = Position.ToPoint();
                 }
                 // Check for bitmapId
                 if (_bitmapId != -1)
@@ -473,37 +502,46 @@ namespace Mapsui.UI.Forms
                             _bitmapIdKey = colorInHex;
                             break;
                         }
-                        // First we have to create a bitmap from Svg code
-                        // Create a new SVG object
-                        var svg = new SKSvg();
+
                         // Load the SVG document
-                        var stream = Utilities.EmbeddedResourceLoader.Load("Images.Pin.svg", typeof(Pin));
-                        if (stream == null)
-                            return;
-                        svg.Load(stream);
+                        Svg.Skia.SKSvg svg;
+                        using (var stream = Utilities.EmbeddedResourceLoader.Load("Images.Pin.svg", typeof(Pin)))
+                        {
+                            if (stream == null)
+                                return;
+
+                            // Create a new SVG object
+                            svg = stream.LoadSvg();
+                            if (svg.Picture == null)
+                                return;
+                        }
+
                         Width = svg.Picture.CullRect.Width * Scale;
                         Height = svg.Picture.CullRect.Height * Scale;
                         // Create bitmap to hold canvas
                         var info = new SKImageInfo((int)svg.Picture.CullRect.Width, (int)svg.Picture.CullRect.Height) { AlphaType = SKAlphaType.Premul };
-                        var bitmap = new SKBitmap(info);
-                        var canvas = new SKCanvas(bitmap);
-                        // Now draw Svg image to bitmap
-                        using (var paint = new SKPaint() { IsAntialias = true })
+                        using (var bitmap = new SKBitmap(info))
                         {
-                            // Replace color while drawing
-                            paint.ColorFilter = SKColorFilter.CreateBlendMode(Color.ToSKColor(), SKBlendMode.SrcIn); // use the source color
-                            canvas.Clear();
-                            canvas.DrawPicture(svg.Picture, paint);
+                            using var canvas = new SKCanvas(bitmap);
+                            // Now draw Svg image to bitmap
+                            using (var paint = new SKPaint() { IsAntialias = true })
+                            {
+                                // Replace color while drawing
+                                paint.ColorFilter = SKColorFilter.CreateBlendMode(Color.ToSKColor(), SKBlendMode.SrcIn); // use the source color
+                                canvas.Clear();
+                                canvas.DrawPicture(svg.Picture, paint);
+                            }
+                            // Now convert canvas to bitmap
+                            using (var image = SKImage.FromBitmap(bitmap))
+                            using (var data = image.Encode(SKEncodedImageFormat.Png, 100))
+                            {
+                                _bitmapData = data.ToArray();
+                            }
+                            _bitmapId = BitmapRegistry.Instance.Register(_bitmapData);
+                            _bitmapIdKey = colorInHex;
+                            _bitmapIds.Add(colorInHex, _bitmapId);
                         }
-                        // Now convert canvas to bitmap
-                        using (var image = SKImage.FromBitmap(bitmap))
-                        using (var data = image.Encode(SKEncodedImageFormat.Png, 100))
-                        {
-                            _bitmapData = data.ToArray();
-                        }
-                        _bitmapId = BitmapRegistry.Instance.Register(new MemoryStream(_bitmapData));
-                        _bitmapIdKey = colorInHex;
-                        _bitmapIds.Add(colorInHex, _bitmapId);
+
                         break;
                     case PinType.Icon:
                         if (Icon != null)
@@ -512,7 +550,7 @@ namespace Mapsui.UI.Forms
                             {
                                 Width = image.Width * Scale;
                                 Height = image.Height * Scale;
-                                _bitmapId = BitmapRegistry.Instance.Register(new MemoryStream(Icon));
+                                _bitmapId = BitmapRegistry.Instance.Register(Icon);
                             }
                         }
                         break;
@@ -535,6 +573,12 @@ namespace Mapsui.UI.Forms
                     });
                 }
             }
+        }
+
+        public virtual void Dispose()
+        {
+            _callout?.Dispose();
+            Feature?.Dispose();
         }
     }
 }
